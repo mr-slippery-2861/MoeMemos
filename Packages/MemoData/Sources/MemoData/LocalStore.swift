@@ -96,6 +96,10 @@ final class LocalStore {
         fetchMemos(rowStatus: rowStatus, limit: limit, offset: offset, pendingOnly: false)
     }
 
+    func listTags() async throws -> [Tag] {
+        try await LocalTagStore.readTags(container: context.container, accountKey: accountKey)
+    }
+
     func listResources() -> [StoredResource] {
         fetchResources()
     }
@@ -333,17 +337,20 @@ final class LocalStore {
         let predicate = #Predicate<StoredMemo> { memo in
             memo.accountKey == accountKey && memo.softDeleted == false
         }
-        let descriptor = FetchDescriptor<StoredMemo>(predicate: predicate)
-        var memos = (try? context.fetch(descriptor)) ?? []
-        memos = memos.filter { memo in
-            memo.rowStatus == rowStatus && (!pendingOnly || memo.syncState != .synced)
-        }
-        memos = memos.sorted { lhs, rhs in
-            if lhs.pinned != rhs.pinned {
-                return lhs.pinned && !rhs.pinned
+        let descriptor = FetchDescriptor<StoredMemo>(
+            predicate: predicate, sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        let fetched = (try? context.fetch(descriptor)) ?? []
+        var pinned: [StoredMemo] = []
+        var unpinned: [StoredMemo] = []
+        for memo in fetched where memo.rowStatus == rowStatus && (!pendingOnly || memo.syncState != .synced) {
+            if memo.pinned {
+                pinned.append(memo)
+            } else {
+                unpinned.append(memo)
             }
-            return lhs.createdAt > rhs.createdAt
         }
+        var memos = pinned + unpinned
         if let offset {
             memos = Array(memos.dropFirst(offset))
         }
@@ -369,5 +376,28 @@ final class LocalStore {
             return true
         }
         return resources.sorted { $0.createdAt > $1.createdAt }
+    }
+}
+
+@ModelActor
+private actor LocalTagStore {
+    @concurrent
+    static func readTags(container: ModelContainer, accountKey: String) async throws -> [Tag] {
+        try Task.checkCancellation()
+        let store = LocalTagStore(modelContainer: container)
+        return try await store.listTags(accountKey: accountKey)
+    }
+
+    private func listTags(accountKey: String) throws -> [Tag] {
+        let predicate = #Predicate<StoredMemo> { memo in
+            memo.accountKey == accountKey && memo.softDeleted == false
+        }
+        let memos = try modelContext.fetch(FetchDescriptor<StoredMemo>(predicate: predicate))
+        var tags = Set<String>()
+        for memo in memos where memo.rowStatus == .normal {
+            try Task.checkCancellation()
+            tags.formUnion(MemoTagExtractor.extract(from: memo.content))
+        }
+        return tags.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { Tag(name: $0) }
     }
 }

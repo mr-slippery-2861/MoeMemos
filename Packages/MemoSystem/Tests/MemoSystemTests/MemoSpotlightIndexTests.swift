@@ -31,6 +31,21 @@ final class MemoSpotlightIndexTests: XCTestCase {
         return (MemoIndexJournal(directory: directory), directory)
     }
 
+    func testIndexRebuildReadsMemoDataOffTheMainThread() async throws {
+        let context = try context()
+        let memo = try memo(in: context)
+        let client = TestSearchIndex()
+        let index = MemoSpotlightIndex(client: client, indexesInMemoryStores: true,
+                                       accountAvailable: { _ in
+                                           XCTAssertFalse(Thread.isMainThread)
+                                           return true
+                                       })
+
+        await index.rebuild(container: context.container)
+
+        XCTAssertEqual(client.entities[try token(memo)]?.content, "Memo")
+    }
+
     func testFlushTimesOutWhileIndexingIsStillBlockedAndLeavesWorkForRecovery() async throws {
         let context = try context()
         let memo = try memo(in: context)

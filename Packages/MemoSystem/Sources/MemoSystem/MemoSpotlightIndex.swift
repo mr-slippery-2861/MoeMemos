@@ -90,12 +90,12 @@ public final class MemoSpotlightIndex: MemoChangeObserver {
     private var pending: Task<Void, Never>?
     private var container: ModelContainer?
     private let indexesInMemoryStores: Bool
-    private let accountAvailable: (String) -> Bool
+    private let accountAvailable: @Sendable (String) -> Bool
     private static let logger = Logger(subsystem: "me.mudkip.MoeMemos", category: "Spotlight")
 
     init(client: any MemoSearchIndexClient = SystemMemoSearchIndex(), indexesInMemoryStores: Bool = false,
          journal: MemoIndexJournal? = nil, retainsChangesForApp: Bool = false,
-         accountAvailable: @escaping (String) -> Bool = { Account.retrieve(accountKey: $0) != nil }) {
+         accountAvailable: @escaping @Sendable (String) -> Bool = { Account.retrieve(accountKey: $0) != nil }) {
         self.client = client
         self.journal = journal
         self.retainsChangesForApp = retainsChangesForApp
@@ -212,15 +212,16 @@ public final class MemoSpotlightIndex: MemoChangeObserver {
 
     private func apply(identifiers: Set<String>, container: ModelContainer) async throws {
         guard !identifiers.isEmpty else { return }
-        let store = MemoEntityStore(context: ModelContext(container), accountAvailable: accountAvailable)
-        let entities = try store.entities(for: Array(identifiers))
+        let entities = try await MemoIndexReader.read(container: container, identifiers: identifiers,
+                                                       accountAvailable: accountAvailable)
         let removed = identifiers.subtracting(entities.map(\.id))
         if !removed.isEmpty { try await client.remove(Array(removed)) }
         if !entities.isEmpty { try await client.index(entities) }
     }
 
     private func replaceIndex(container: ModelContainer) async throws {
-        let entities = try MemoEntityStore(context: ModelContext(container), accountAvailable: accountAvailable).allEntities()
+        let entities = try await MemoIndexReader.read(container: container, identifiers: nil,
+                                                       accountAvailable: accountAvailable)
         try await client.removeAll()
         if !entities.isEmpty { try await client.index(entities) }
         try journal?.markInitialized()
@@ -246,5 +247,24 @@ public final class MemoSpotlightIndex: MemoChangeObserver {
                 self.finishWaiter(id)
             }
         }
+    }
+}
+
+@ModelActor
+private actor MemoIndexReader {
+    @concurrent
+    static func read(container: ModelContainer, identifiers: Set<String>?,
+                     accountAvailable: @escaping @Sendable (String) -> Bool) async throws -> [MemoEntity] {
+        let reader = MemoIndexReader(modelContainer: container)
+        return try await reader.read(identifiers: identifiers, accountAvailable: accountAvailable)
+    }
+
+    private func read(identifiers: Set<String>?,
+                      accountAvailable: @escaping @Sendable (String) -> Bool) throws -> [MemoEntity] {
+        let store = MemoEntityStore(context: modelContext, accountAvailable: accountAvailable)
+        if let identifiers {
+            return try store.entities(for: Array(identifiers))
+        }
+        return try store.allEntities()
     }
 }

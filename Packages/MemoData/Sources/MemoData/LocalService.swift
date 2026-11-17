@@ -128,9 +128,7 @@ final class LocalService: Service {
     }
 
     func listTags() async throws -> [Tag] {
-        let memos = store.listMemos(rowStatus: .normal)
-        let tags = Set(memos.flatMap { MemoTagExtractor.extract(from: $0.content) })
-        return tags.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { Tag(name: $0) }
+        try await store.listTags()
     }
 
     func listResources() async throws -> [StoredResource] {

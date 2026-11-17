@@ -7,6 +7,7 @@
 
 import MemoData
 import SwiftUI
+import SwiftData
 import Account
 import Models
 import Env
@@ -16,7 +17,10 @@ import DesignSystem
 struct MemosList: View {
     let tag: Tag?
 
+    private static let pageSize = 40
     @State private var searchString = ""
+    @State private var visibleLimit = Self.pageSize
+    @State private var filterResult: FilterResult?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AppPath.self) private var appPath
@@ -27,13 +31,37 @@ struct MemosList: View {
     @State private var showingManualSyncAlert = false
     @State private var showingHigherV1SyncConfirmation = false
     @State private var hasDraft = false
+
+    private struct FilterRequest: Equatable {
+        let accountKey: String?
+        let revision: Int
+        let tag: Tag?
+        let searchString: String
+
+        var isActive: Bool { tag != nil || !searchString.isEmpty }
+    }
+
+    private struct FilterResult {
+        let request: FilterRequest
+        let memoIDs: Set<PersistentIdentifier>
+    }
+
+    private struct SearchEntry: Sendable {
+        let id: PersistentIdentifier
+        let content: String
+    }
     
     var body: some View {
         let defaultMemoVisibility = userState.currentUser?.defaultVisibility ?? .private
-        let filteredMemoList = filterMemoList(memosViewModel.memoList, tag: tag, searchString: searchString)
-        let unsyncedCount = memosViewModel.memoList.filter { $0.syncState != .synced }.count
+        let request = FilterRequest(accountKey: accountManager.currentAccount?.key, revision: memosViewModel.memoListRevision,
+                                    tag: tag, searchString: searchString)
+        let matchingIDs = filterResult?.request == request ? filterResult?.memoIDs : nil
+        let memoList = memosViewModel.memoList
+        let isFiltering = request.isActive && matchingIDs == nil
+        let filteredMemoList = isFiltering ? [] : orderedMemos(memoList, matchingIDs: matchingIDs)
+        let visibleMemos = filteredMemoList.prefix(visibleLimit)
         let canSync = ((try? memosViewModel.service) as? SyncableService) != nil
-        let isFirstLoad = !memosViewModel.inited && memosViewModel.memoList.isEmpty
+        let isFirstLoad = !memosViewModel.inited && memoList.isEmpty
         
         ZStack(alignment: .bottomTrailing) {
             if let error = memosViewModel.loadError, memosViewModel.memoList.isEmpty {
@@ -44,7 +72,7 @@ struct MemosList: View {
                 } actions: {
                     Button("common.retry") { Task { try? await memosViewModel.loadMemos() } }
                 }
-            } else if isFirstLoad {
+            } else if isFirstLoad || isFiltering {
                 ProgressView("common.loading")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredMemoList.isEmpty {
@@ -81,7 +109,7 @@ struct MemosList: View {
                         }
                     }
 
-                    ForEach(filteredMemoList, id: \.id) { item in
+                    ForEach(visibleMemos, id: \.id) { item in
                         Section {
                             if #available(iOS 26, *) {
                                 NavigationLink(value: Route.memo(item.id)) {
@@ -93,6 +121,12 @@ struct MemosList: View {
                                     .onTapGesture {
                                         appPath.navigationRequest = .push(.memo(item.id))
                                     }
+                            }
+                        }
+                        .onAppear {
+                            if item.id == visibleMemos.last?.id && visibleLimit == visibleMemos.count
+                                && visibleMemos.count < filteredMemoList.count {
+                                visibleLimit += Self.pageSize
                             }
                         }
                     }
@@ -118,7 +152,32 @@ struct MemosList: View {
             }
         }
         .task(id: accountManager.currentAccount?.key) {
+            visibleLimit = Self.pageSize
             refreshDraftAvailability()
+        }
+        .task(id: request) {
+            guard request.isActive else {
+                filterResult = nil
+                return
+            }
+            do {
+                if !request.searchString.isEmpty {
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                try Task.checkCancellation()
+                let entries = memosViewModel.memoList.map { SearchEntry(id: $0.id, content: $0.content) }
+                let matches = try await Self.matchingIDs(in: entries, tag: request.tag, searchString: request.searchString)
+                try Task.checkCancellation()
+                filterResult = FilterResult(request: request, memoIDs: matches)
+            } catch {
+                // A newer query or a different account superseded this request.
+            }
+        }
+        .onChange(of: searchString) { _, _ in
+            visibleLimit = Self.pageSize
+        }
+        .onChange(of: tag) { _, _ in
+            visibleLimit = Self.pageSize
         }
         .onChange(of: appPath.presentedSheet) { _, sheet in
             if sheet == nil { refreshDraftAvailability() }
@@ -126,7 +185,7 @@ struct MemosList: View {
         .toolbar {
             if canSync {
                 ToolbarItem(placement: .topBarTrailing) {
-                    SyncStatusBadge(syncing: memosViewModel.syncing, unsyncedCount: unsyncedCount) {
+                    SyncStatusBadge(syncing: memosViewModel.syncing, unsyncedCount: memoList.count(where: { $0.syncState != .synced })) {
                         triggerManualSync()
                     }
                 }
@@ -205,23 +264,28 @@ struct MemosList: View {
         }
     }
     
-    private func filterMemoList(_ memoList: [StoredMemo], tag: Tag?, searchString: String) -> [StoredMemo] {
-        let pinned = memoList.filter { $0.pinned == true }
-        let nonPinned = memoList.filter { !($0.pinned == true) }
-        var fullList = pinned + nonPinned
-        
-        if let tag = tag {
-            fullList = fullList.filter({ memo in
-                MemoTagExtractor.extract(from: memo.content).contains(where: tag.matches)
-            })
+    private func orderedMemos(_ memoList: [StoredMemo], matchingIDs: Set<PersistentIdentifier>?) -> [StoredMemo] {
+        var pinned: [StoredMemo] = []
+        var unpinned: [StoredMemo] = []
+        for memo in memoList where matchingIDs?.contains(memo.id) ?? true {
+            if memo.pinned {
+                pinned.append(memo)
+            } else {
+                unpinned.append(memo)
+            }
         }
-        
-        if !searchString.isEmpty {
-            fullList = fullList.filter({ memo in
-                memo.content.localizedCaseInsensitiveContains(searchString)
-            })
+        return pinned + unpinned
+    }
+
+    @concurrent
+    private static func matchingIDs(in entries: [SearchEntry], tag: Tag?, searchString: String) async throws -> Set<PersistentIdentifier> {
+        var matches = Set<PersistentIdentifier>()
+        for entry in entries {
+            try Task.checkCancellation()
+            if !searchString.isEmpty && !entry.content.localizedCaseInsensitiveContains(searchString) { continue }
+            if let tag, !MemoTagExtractor.extract(from: entry.content).contains(where: tag.matches) { continue }
+            matches.insert(entry.id)
         }
-        
-        return fullList
+        return matches
     }
 }

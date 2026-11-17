@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-public struct Tag: Hashable, Identifiable {
+public struct Tag: Hashable, Identifiable, Sendable {
     public var name: String
     public var id: String { name }
     

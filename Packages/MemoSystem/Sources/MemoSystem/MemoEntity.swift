@@ -58,7 +58,6 @@ public struct MemoEntity: IndexedEntity, Transferable {
         ProxyRepresentation(exporting: \.content)
     }
 
-    @MainActor
     public init?(memo: StoredMemo, accountName: String) {
         guard !memo.softDeleted, memo.rowStatus == .normal,
               let id = MemoEntityIdentifier(accountKey: memo.accountKey, persistentID: memo.id).token else { return nil }
@@ -98,8 +97,7 @@ public struct MemoEntityQuery: EntityStringQuery {
     }
 }
 
-/// Reads local data only; entity resolution must never initiate a remote sync.
-@MainActor
+/// Reads local data on the executor that owns the supplied model context.
 public struct MemoEntityStore {
     public static let persistentIdentifier = "MemoEntity"
     let context: ModelContext

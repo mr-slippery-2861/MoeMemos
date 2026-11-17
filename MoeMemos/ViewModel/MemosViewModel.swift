@@ -67,15 +67,18 @@ enum BackgroundSyncThrottle {
 
     private(set) var memoList: [StoredMemo] = [] {
         didSet {
+            memoListRevision += 1
             matrix = DailyUsageStat.calculateMatrix(memoList: memoList)
         }
     }
+    private(set) var memoListRevision = 0
     private(set) var tags: [Tag] = []
     private(set) var nestedTags: [NestedTag] = []
     private(set) var matrix: [DailyUsageStat] = DailyUsageStat.initialMatrix
     private(set) var loadError: String?
     private(set) var inited = false
     private(set) var syncing = false
+    @ObservationIgnored private var tagLoadGeneration = 0
     
     @MainActor
     func loadMemos() async throws {
@@ -96,8 +99,15 @@ enum BackgroundSyncThrottle {
     @MainActor
     func loadTags() async throws {
         let service = try self.service
-        tags = try await service.listTags()
-        nestedTags = NestedTag.fromTagList(tags.map { $0.name })
+        let account = accountManager.currentAccount
+        tagLoadGeneration += 1
+        let generation = tagLoadGeneration
+        let loadedTags = try await service.listTags()
+        guard !Task.isCancelled, account == accountManager.currentAccount, generation == tagLoadGeneration else {
+            return
+        }
+        tags = loadedTags
+        nestedTags = NestedTag.fromTagList(loadedTags.map(\.name))
     }
     
     @MainActor
@@ -127,6 +137,7 @@ enum BackgroundSyncThrottle {
     func editMemo(id: PersistentIdentifier, content: String, visibility: MemoVisibility = .private, resources: [PersistentIdentifier]? = nil, tags: [String]?, location: MemoLocationUpdate? = nil) async throws {
         let service = try self.service
         _ = try await service.updateMemo(id: id, content: content, resources: resources, visibility: visibility, tags: tags, pinned: nil, location: service.supportsMemoLocations ? location : nil)
+        memoListRevision += 1
         try await loadTags()
     }
 

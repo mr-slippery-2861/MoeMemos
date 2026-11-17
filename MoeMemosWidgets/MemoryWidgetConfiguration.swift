@@ -10,6 +10,7 @@ import Foundation
 import AppIntents
 import Models
 import MemoData
+import SwiftData
 
 @available(iOS 17.0, macOS 14.0, watchOS 10.0, *)
 struct MemoryWidgetConfiguration: AppIntent, WidgetConfigurationIntent, CustomIntentMigratedAppIntent {
@@ -81,24 +82,38 @@ struct MemoryWidgetMemoEntityQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [MemoryWidgetMemoEntity] {
-        try await loadSuggestedEntitiesFromStore()
+        try await loadSuggestedEntitiesFromStore(limit: 100)
     }
 
     func defaultResult() async -> MemoryWidgetMemoEntity? {
-        return try? await suggestedEntities().first
+        try? await loadSuggestedEntitiesFromStore(limit: 1).first
     }
 }
 
 @MainActor
-private func loadSuggestedEntitiesFromStore() async throws -> [MemoryWidgetMemoEntity] {
+private func loadSuggestedEntitiesFromStore(limit: Int) throws -> [MemoryWidgetMemoEntity] {
     let context = AppInfo().modelContext
-    let accountKey = AccountManager(modelContext: context).currentAccount?.key
-    return try MemoEntityStore(context: context).allEntities()
-        .filter { $0.accountKey == accountKey }.prefix(100).compactMap { entity in
-            guard let key = MemoEntityIdentifier(token: entity.id),
-                  let token = PersistentIdentifierTokenCoder.encode(key.persistentID) else { return nil }
-            return MemoryWidgetMemoEntity(id: token, content: entity.content, createdAt: entity.createdAt)
+    guard let accountKey = AccountManager(modelContext: context).currentUser?.accountKey else { return [] }
+    var descriptor = FetchDescriptor<StoredMemo>(
+        predicate: #Predicate { $0.accountKey == accountKey && !$0.softDeleted },
+        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+    )
+    let batchSize = max(limit, 50)
+    descriptor.fetchLimit = batchSize
+    var results: [MemoryWidgetMemoEntity] = []
+    // Row status is a Codable value, so check it after fetching each batch.
+    while results.count < limit {
+        try Task.checkCancellation()
+        let batch = try context.fetch(descriptor)
+        for memo in batch where memo.rowStatus == .normal {
+            guard let token = PersistentIdentifierTokenCoder.encode(memo.id) else { continue }
+            results.append(MemoryWidgetMemoEntity(id: token, content: memo.content, createdAt: memo.createdAt))
+            if results.count == limit { return results }
         }
+        guard batch.count == batchSize else { break }
+        descriptor.fetchOffset = (descriptor.fetchOffset ?? 0) + batchSize
+    }
+    return results
 }
 
 @available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, *)
