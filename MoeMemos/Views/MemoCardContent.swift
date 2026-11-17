@@ -98,10 +98,18 @@ struct MemoCardContent: View {
     @ViewBuilder
     private var markdownContent: some View {
         if textSelectionEnabled {
-            MarkdownText(cachedPreprocessedMarkdown)
-                .markdownTaskListMarker { listItem in
-                    taskListMarker(for: listItem)
+            MarkdownReader(cachedPreprocessedMarkdown) { parsed in
+                let documents = MemoMarkdownRendering.documents(in: parsed.document)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(documents.indices, id: \.self) { index in
+                        let segment = segment(parsed, document: documents[index])
+                        MarkdownText(segment)
+                            .markdownTaskListMarker { listItem in
+                                taskListMarker(for: listItem, document: parsed.document)
+                            }
+                    }
                 }
+            }
         } else {
             MarkdownView(cachedPreprocessedMarkdown)
                 .markdownTaskListMarker { listItem in
@@ -110,9 +118,20 @@ struct MemoCardContent: View {
         }
     }
 
-    private func taskListMarker(for listItem: ListItem) -> some View {
+    private func segment(_ parsed: MarkdownParseResult, document: Markdown.Document) -> MarkdownParseResult {
+        var segment = parsed
+        segment.document = document
+        return segment
+    }
+
+    private func taskListMarker(for listItem: ListItem, document: Markdown.Document? = nil) -> some View {
         Button {
-            toggleTaskItem?(toggledMarkdown(for: listItem))
+            if let document {
+                guard let updated = MemoMarkdownRendering.togglingTask(listItem, in: document) else { return }
+                toggleTaskItem?(MemoTagMarkdownPreprocessor.restoreRawMarkdown(updated.format()))
+            } else {
+                toggleTaskItem?(toggledMarkdown(for: listItem))
+            }
         } label: {
             Image(systemName: listItem.checkbox == .checked ? "checkmark.square.fill" : "square")
                 .symbolRenderingMode(.hierarchical)
