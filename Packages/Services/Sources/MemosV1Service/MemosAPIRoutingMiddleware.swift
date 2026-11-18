@@ -20,12 +20,12 @@ actor MemosAPIRoutingMiddleware: ClientMiddleware {
             profileRequest.headerFields[.contentType] = nil
             var result = try await next(profileRequest, nil, baseURL)
             var unversioned = false
-            if result.0.status == .notFound || result.0.status == .gone {
+            if result.0.status == .notFound || result.0.status == .gone || isHTML(result.0) {
                 profileRequest.path = "/api/instance/profile"
                 result = try await next(profileRequest, nil, baseURL)
                 unversioned = true
             }
-            guard (200..<300).contains(result.0.status.code) else {
+            guard (200..<300).contains(result.0.status.code), !isHTML(result.0) else {
                 return result
             }
             usesUnversionedAPI = unversioned
@@ -39,5 +39,10 @@ actor MemosAPIRoutingMiddleware: ClientMiddleware {
             request.path = "/api/" + path.dropFirst("/api/v1/".count)
         }
         return try await next(request, body, baseURL)
+    }
+
+    private func isHTML(_ response: HTTPResponse) -> Bool {
+        (200..<300).contains(response.status.code) &&
+            response.headerFields[.contentType]?.lowercased().hasPrefix("text/html") == true
     }
 }

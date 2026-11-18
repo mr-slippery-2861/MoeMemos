@@ -870,6 +870,276 @@ paths:
                         application/json:
                             schema:
                                 "$ref": "#/components/schemas/Status"
+    "/api/v1/users/{user}/usage":
+        get:
+            operationId: UserService_GetUserUsage
+            parameters:
+            -   name: user
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/UserUsage"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/instance/settings/{setting}":
+        get:
+            operationId: InstanceService_GetInstanceSetting
+            parameters:
+            -   name: setting
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/InstanceSetting"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/spaces":
+        get:
+            operationId: SpaceService_ListSpaces
+            parameters:
+            -   name: pageSize
+                in: query
+                schema: {type: integer, format: int32}
+            -   name: pageToken
+                in: query
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/ListSpacesResponse"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+        post:
+            operationId: SpaceService_CreateSpace
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: {"$ref": "#/components/schemas/WorkspaceSpace"}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/WorkspaceSpace"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/users/{user}/views":
+        get:
+            operationId: UserService_ListMemoViews
+            parameters:
+            -   name: user
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/ListMemoViewsResponse"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+        post:
+            operationId: UserService_CreateMemoView
+            parameters:
+            -   name: user
+                in: path
+                required: true
+                schema: {type: string}
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: {"$ref": "#/components/schemas/SavedMemoView"}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/SavedMemoView"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/users/{user}/views/{view}":
+        patch:
+            operationId: UserService_UpdateMemoView
+            parameters:
+            -   name: user
+                in: path
+                required: true
+                schema: {type: string}
+            -   name: view
+                in: path
+                required: true
+                schema: {type: string}
+            -   name: updateMask
+                in: query
+                schema: {type: string}
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: {"$ref": "#/components/schemas/SavedMemoView"}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/SavedMemoView"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+        delete:
+            operationId: UserService_DeleteMemoView
+            parameters:
+            -   name: user
+                in: path
+                required: true
+                schema: {type: string}
+            -   name: view
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/memos/{memo}/reactions/{reaction}":
+        delete:
+            operationId: MemoService_DeleteMemoReaction
+            parameters:
+            -   name: memo
+                in: path
+                required: true
+                schema: {type: string}
+            -   name: reaction
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/memos/{memo}/shares":
+        get:
+            operationId: MemoService_ListMemoShares
+            parameters:
+            -   name: memo
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/ListMemoSharesResponse"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+        post:
+            operationId: MemoService_CreateMemoShare
+            parameters:
+            -   name: memo
+                in: path
+                required: true
+                schema: {type: string}
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: {"$ref": "#/components/schemas/MemoShare"}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/MemoShare"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/memos/{memo}/shares/{share}":
+        delete:
+            operationId: MemoService_DeleteMemoShare
+            parameters:
+            -   name: memo
+                in: path
+                required: true
+                schema: {type: string}
+            -   name: share
+                in: path
+                required: true
+                schema: {type: string}
+            responses:
+                '200':
+                    description: OK
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
+    "/api/v1/attachments:upload":
+        post:
+            operationId: AttachmentService_UploadAttachment
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: {"$ref": "#/components/schemas/UploadAttachmentRequest"}
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/UploadAttachmentResponse"}
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema: {"$ref": "#/components/schemas/Status"}
 components:
     schemas:
         Attachment:
@@ -1099,6 +1369,8 @@ components:
                     type: string
                     description: The display timestamp of the memo.
                     format: date-time
+                space:
+                    type: string
                 content:
                     type: string
                     description: Required. The content of the memo in Markdown format.
@@ -1299,11 +1571,10 @@ components:
                 model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
         UpsertMemoReactionRequest:
             required:
-            - name
             - reaction
             type: object
             properties:
-                name:
+                parent:
                     type: string
                     description: |-
                         Required. The resource name of the memo.
@@ -1452,6 +1723,92 @@ components:
                     type: integer
                     format: int32
             description: Memo type statistics.
+        UserUsageLimits:
+            type: object
+            properties:
+                memoContentBytes: {type: string}
+                uploadBytes: {type: string}
+                memoCount: {type: string}
+                storageBytes: {type: string}
+        UserUsage:
+            type: object
+            properties:
+                limits: {"$ref": "#/components/schemas/UserUsageLimits"}
+                memoCount: {type: string}
+                storageBytes: {type: string}
+        InstanceSetting:
+            type: object
+            properties:
+                memoRelatedSetting: {"$ref": "#/components/schemas/MemoRelatedSetting"}
+                storageSetting: {"$ref": "#/components/schemas/StorageSetting"}
+        MemoRelatedSetting:
+            type: object
+            properties:
+                contentLengthLimit: {type: integer, format: int32}
+        StorageSetting:
+            type: object
+            properties:
+                uploadSizeLimitMb: {type: string}
+        WorkspaceIcon:
+            type: object
+            properties:
+                emoji: {type: string}
+                lucide: {type: string}
+        WorkspaceSpace:
+            type: object
+            properties:
+                name: {type: string}
+                title: {type: string}
+                description: {type: string}
+                icon: {"$ref": "#/components/schemas/WorkspaceIcon"}
+                memberCount: {type: integer, format: int32}
+        ListSpacesResponse:
+            type: object
+            properties:
+                spaces: {items: {"$ref": "#/components/schemas/WorkspaceSpace"}, type: array}
+                nextPageToken: {type: string}
+        SavedMemoView:
+            type: object
+            properties:
+                name: {type: string}
+                title: {type: string}
+                filter: {type: string}
+                icon: {"$ref": "#/components/schemas/WorkspaceIcon"}
+        ListMemoViewsResponse:
+            type: object
+            properties:
+                memoViews: {items: {"$ref": "#/components/schemas/SavedMemoView"}, type: array}
+        MemoShare:
+            type: object
+            properties:
+                name: {type: string}
+                expireTime: {type: string, format: date-time}
+                createTime: {type: string, format: date-time}
+        ListMemoSharesResponse:
+            type: object
+            properties:
+                memoShares: {items: {"$ref": "#/components/schemas/MemoShare"}, type: array}
+        UploadAttachmentRequest:
+            type: object
+            properties:
+                spec: {"$ref": "#/components/schemas/UploadAttachmentSpec"}
+                uploadId: {type: string}
+                writeOffset: {type: string}
+                data: {type: string, format: byte}
+                finishWrite: {type: boolean}
+        UploadAttachmentSpec:
+            type: object
+            properties:
+                attachment: {"$ref": "#/components/schemas/Attachment"}
+                totalSize: {type: string}
+        UploadAttachmentResponse:
+            type: object
+            properties:
+                uploadId: {type: string}
+                committedSize: {type: string}
+                maxChunkSize: {type: integer, format: int32}
+                attachment: {"$ref": "#/components/schemas/Attachment"}
+
 tags:
 -   name: AttachmentService
 -   name: AuthService

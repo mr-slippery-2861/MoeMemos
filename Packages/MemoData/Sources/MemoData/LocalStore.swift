@@ -293,6 +293,19 @@ final class LocalStore {
         return stored
     }
 
+    func setResources(_ ids: [PersistentIdentifier], for memo: StoredMemo) {
+        let desired = Set(ids)
+        for resource in memo.resources where !desired.contains(resource.persistentModelID) {
+            resource.memo = nil
+            resource.memoPosition = nil
+        }
+        for (position, id) in ids.enumerated() {
+            guard let resource = fetchResource(id: id), resource.accountKey == accountKey else { continue }
+            resource.memo = memo
+            resource.memoPosition = position
+        }
+    }
+
     func reconcileResources(_ resources: [Resource], to memo: StoredMemo, preserveLocalOnly: Bool = false) {
         let desiredRemoteIds = Set(resources.compactMap(\.remoteId))
         let existing = memo.resources
@@ -305,12 +318,16 @@ final class LocalStore {
                 continue
             }
             stored.memo = nil
+            stored.memoPosition = nil
         }
 
-        for resource in resources {
+        for (position, resource) in resources.enumerated() {
             guard resource.remoteId != nil else { continue }
             let stored = upsertResource(resource, memo: memo, syncState: .synced, keepSyncState: true)
             stored.memo = memo
+            if stored.memoPosition != position {
+                stored.memoPosition = position
+            }
             stored.softDeleted = false
         }
     }

@@ -44,6 +44,28 @@ final class LocalMemoListingTests: XCTestCase {
         XCTAssertEqual(store.listMemos(rowStatus: .archived).map(\.content), ["Archived pin"])
     }
 
+    func testAttachmentOrderSurvivesReloadAndServerReconciliation() throws {
+        let container = try makeContainer()
+        let store = LocalStore(context: container.mainContext, accountKey: "local")
+        let memo = insert("Memo", into: container.mainContext)
+        let first = Resource(filename: "first.txt", size: 10, mimeType: "text/plain",
+                             createdAt: Date(), updatedAt: Date(), remoteId: "attachments/first",
+                             url: URL(string: "https://memos.example/file/first")!)
+        let second = Resource(filename: "second.txt", size: 10, mimeType: "text/plain",
+                              createdAt: Date().addingTimeInterval(10), updatedAt: Date(), remoteId: "attachments/second",
+                              url: URL(string: "https://memos.example/file/second")!)
+        store.reconcileResources([first, second], to: memo)
+        try store.save()
+        let id = memo.persistentModelID
+        let reloaded = try XCTUnwrap(ModelContext(container).model(for: id) as? StoredMemo)
+        XCTAssertEqual(reloaded.orderedResources.map(\.filename), ["first.txt", "second.txt"])
+
+        store.setResources(Array(memo.orderedResources.reversed()).map(\.persistentModelID), for: memo)
+        try store.save()
+        let reordered = try XCTUnwrap(ModelContext(container).model(for: id) as? StoredMemo)
+        XCTAssertEqual(reordered.orderedResources.map(\.filename), ["second.txt", "first.txt"])
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(for: User.self, StoredMemo.self, StoredResource.self,
                            configurations: ModelConfiguration(isStoredInMemoryOnly: true))

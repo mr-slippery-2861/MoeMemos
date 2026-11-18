@@ -56,11 +56,7 @@ final class LocalService: Service {
         stored.lastSyncedAt = .now
         stored.syncState = .synced
 
-        for resourceId in resources {
-            if let resource = store.fetchResource(id: resourceId) {
-                resource.memo = stored
-            }
-        }
+        store.setResources(resources, for: stored)
         try store.save()
         return stored
     }
@@ -82,16 +78,7 @@ final class LocalService: Service {
             stored.pinned = pinned
         }
         if let resources {
-            let desired = Set(resources)
-            let existing = stored.resources
-            for res in existing where !desired.contains(res.persistentModelID) {
-                res.memo = nil
-            }
-            for resourceId in resources {
-                if let resource = store.fetchResource(id: resourceId) {
-                    resource.memo = stored
-                }
-            }
+            store.setResources(resources, for: stored)
         }
         stored.updatedAt = .now
         stored.syncState = .synced

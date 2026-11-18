@@ -72,6 +72,17 @@ final class MemosCalendarVersionTests: XCTestCase {
         XCTAssertEqual(payload?["content"] as? String, Data("file".utf8).base64EncodedString())
     }
 
+    func testSPAHTMLFallsBackToUnversionedProfile() async throws {
+        let transport = CompatibilityTransport(version: "26.11.1", legacyStatus: .ok)
+        let service = MemosV1Service(hostURL: URL(string: "https://memos.example")!, accessToken: nil, userId: "alice", transport: transport)
+        let profile = try await service.getWorkspaceProfile()
+        _ = try await service.listMemos()
+        let requests = await transport.requests
+        XCTAssertEqual(profile.version, "26.11.1")
+        XCTAssertEqual(requests.prefix(2).map(\.path), ["/api/v1/instance/profile", "/api/instance/profile"])
+        XCTAssertTrue(requests.last?.path?.hasPrefix("/api/memos") == true)
+    }
+
     func testProfileErrorsDoNotTriggerFallbackOrWrites() async throws {
         for status in [HTTPResponse.Status.unauthorized, .internalServerError] {
             let transport = CompatibilityTransport(version: "26.11.0", legacyStatus: status)
@@ -105,6 +116,9 @@ private actor CompatibilityTransport: ClientTransport {
         requests.append(request)
         baseURLs.append(baseURL)
         if request.path == "/api/v1/instance/profile", let legacyStatus {
+            if legacyStatus == .ok {
+                return (HTTPResponse(status: .ok, headerFields: [.contentType: "text/html"]), HTTPBody("<html></html>"))
+            }
             return response(["code": 12, "message": "Legacy route unavailable"], status: legacyStatus)
         }
         if request.path?.hasSuffix("/instance/profile") == true {

@@ -111,3 +111,100 @@ public extension Service {
         try await updateMemo(id: id, content: content, resources: resources, visibility: visibility, tags: tags, pinned: pinned, location: nil)
     }
 }
+
+/// The effective per-note and per-file server limits, in bytes.
+public struct MemoWriteLimits: Sendable, Equatable {
+    public let contentBytes: Int?
+    public let uploadBytes: Int64?
+
+    public init(contentBytes: Int?, uploadBytes: Int64?) {
+        self.contentBytes = contentBytes.flatMap { $0 > 0 ? $0 : nil }
+        self.uploadBytes = uploadBytes.flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    public func validate(content: String) throws {
+        if let contentBytes, content.utf8.count > contentBytes {
+            throw MoeMemosError.memoTooLong(contentBytes)
+        }
+    }
+
+    public func validate(uploadSize: Int64) throws {
+        if let uploadBytes, uploadSize > uploadBytes {
+            throw MoeMemosError.fileTooLarge(uploadBytes)
+        }
+    }
+}
+
+@MainActor
+public protocol MemoWritePolicyService: RemoteService {
+    func memoWriteLimits() async throws -> MemoWriteLimits
+}
+
+public struct MemosSpace: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let emoji: String?
+
+    public init(id: String, title: String, emoji: String?) {
+        self.id = id
+        self.title = title
+        self.emoji = emoji
+    }
+}
+
+public struct SavedMemosView: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let filter: String
+    public let emoji: String?
+
+    public init(id: String, title: String, filter: String, emoji: String?) {
+        self.id = id
+        self.title = title
+        self.filter = filter
+        self.emoji = emoji
+    }
+}
+
+public struct MemoReaction: Identifiable, Sendable {
+    public let id: String
+    public let emoji: String
+    public let isMine: Bool
+
+    public init(id: String, emoji: String, isMine: Bool) {
+        self.id = id
+        self.emoji = emoji
+        self.isMine = isMine
+    }
+}
+
+public struct MemoShareLink: Identifiable, Sendable {
+    public let id: String
+    public let url: URL
+    public let expiry: Date?
+
+    public init(id: String, url: URL, expiry: Date?) {
+        self.id = id
+        self.url = url
+        self.expiry = expiry
+    }
+}
+
+@MainActor
+public protocol MemosWorkspaceService: RemoteService {
+    var webURL: URL { get }
+    func supportsCollections() async throws -> Bool
+    func listSpaces() async throws -> [MemosSpace]
+    func createSpace(title: String, description: String) async throws
+    func memoPlacement(memo: String) async throws -> (space: String?, visibility: MemoVisibility)
+    func updateMemoPlacement(memo: String, space: String?, visibility: MemoVisibility) async throws
+    func listSavedViews() async throws -> [SavedMemosView]
+    func saveView(id: String?, title: String, filter: String) async throws
+    func deleteView(id: String) async throws
+    func listMemos(filter: String?, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?)
+    func listReactions(memo: String) async throws -> [MemoReaction]
+    func toggleReaction(memo: String, emoji: String, existing: MemoReaction?) async throws
+    func listShareLinks(memo: String) async throws -> [MemoShareLink]
+    func createShareLink(memo: String, expires: Date?) async throws
+    func revokeShareLink(memo: String, share: String) async throws
+}

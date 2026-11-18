@@ -56,6 +56,7 @@
 		199A657B28C474BA00C39994 /* Color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199A657A28C474BA00C39994 /* Color.swift */; };
 		199A657D28C4761100C39994 /* Usage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199A657C28C4761100C39994 /* Usage.swift */; };
 		199A657F28C47D7C00C39994 /* Sidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199A657E28C47D7C00C39994 /* Sidebar.swift */; };
+		0FF2C20708FB42369DB2B7F1 /* MemosWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9614824973524018B043F1EE /* MemosWorkspaceView.swift */; };
 		199C6CC62B009F19005C6921 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 199C6CC52B009F19005C6921 /* Models */; };
 		199C6CC82B009F2F005C6921 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 199C6CC72B009F2F005C6921 /* Models */; };
 		19B3B79529CEB9C5007E2997 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 1948CCAF2996B3FA00AB1986 /* Localizable.xcstrings */; };
@@ -89,6 +90,7 @@
 		20B1A2C3D4E5F60718293A4E /* MemoKit in Frameworks */ = {isa = PBXBuildFile; productRef = 20B1A2C3D4E5F60718293A4C /* MemoKit */; };
 		2A9F4C1F2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A9F4C1E2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift */; };
 		2AA1B2C32F5A6B7C00D1E2F3 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */; };
+		3832F25008B04FA7AB2BA0AB /* MemosMemoActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */; };
 		2AC7F0B72F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC7F0B62F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift */; };
 		2B7D9E3C2F4A110000ABC001 /* SyncStatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7D9E3C2F4A110000ABC002 /* SyncStatusBadge.swift */; };
 		2C6B0A852F8112F000A1C0DE /* SupportPurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C6B0A842F8112F000A1C0DE /* SupportPurchaseStore.swift */; };
@@ -179,6 +181,7 @@
 		199A657A28C474BA00C39994 /* Color.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Color.swift; sourceTree = "<group>"; };
 		199A657C28C4761100C39994 /* Usage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Usage.swift; sourceTree = "<group>"; };
 		199A657E28C47D7C00C39994 /* Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar.swift; sourceTree = "<group>"; };
+		9614824973524018B043F1EE /* MemosWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosWorkspaceView.swift; sourceTree = "<group>"; };
 		19C569A32912493A00745F9D /* ArchivedMemoListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivedMemoListViewModel.swift; sourceTree = "<group>"; };
 		19C569AB29125C0700745F9D /* ResourceListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceListViewModel.swift; sourceTree = "<group>"; };
 		19C9975F2CF35D49009763C5 /* MemoryUpdatePeriodAppEnum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryUpdatePeriodAppEnum.swift; sourceTree = "<group>"; };
@@ -199,6 +202,7 @@
 		19FC1C7D290DA6E90078A7F2 /* Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Navigation.swift; sourceTree = "<group>"; };
 		2A9F4C1E2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoMarkdownPreprocessor.swift; sourceTree = "<group>"; };
 		2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
+		21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosMemoActions.swift; sourceTree = "<group>"; };
 		2AC7F0B62F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoTagMarkdownPreprocessor.swift; sourceTree = "<group>"; };
 		2B7D9E3C2F4A110000ABC002 /* SyncStatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusBadge.swift; sourceTree = "<group>"; };
 		2C6B0A842F8112F000A1C0DE /* SupportPurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportPurchaseStore.swift; sourceTree = "<group>"; };
@@ -418,12 +422,14 @@
 				193938DB29CF682D0027939F /* MemoCardContent.swift */,
 				197A4D3229599C300027427E /* MemoCardImageView.swift */,
 				2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */,
+				21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */,
 				AA1000000000000000000003 /* MemoComments.swift */,
 				19F31BF628C3E26D000C5207 /* MemosList.swift */,
 				19FC1C7D290DA6E90078A7F2 /* Navigation.swift */,
 				193AA89A28CCD34A00FF7EB6 /* Resources.swift */,
 				193DE92228C5E267002651E0 /* Settings.swift */,
 				199A657E28C47D7C00C39994 /* Sidebar.swift */,
+				9614824973524018B043F1EE /* MemosWorkspaceView.swift */,
 				19E1C5BD28C4F6410072CEEF /* Stats.swift */,
 				2B7D9E3C2F4A110000ABC002 /* SyncStatusBadge.swift */,
 			);
@@ -661,6 +667,7 @@
 				19E1C5BE28C4F6410072CEEF /* Stats.swift in Sources */,
 				19F31BFD28C3ED11000C5207 /* MemoCard.swift in Sources */,
 				199A657F28C47D7C00C39994 /* Sidebar.swift in Sources */,
+				0FF2C20708FB42369DB2B7F1 /* MemosWorkspaceView.swift in Sources */,
 				193DE93028C65104002651E0 /* MemosViewModel.swift in Sources */,
 				192DF0F328C78BAD0077E785 /* ArchivedMemosList.swift in Sources */,
 				199A657B28C474BA00C39994 /* Color.swift in Sources */,
@@ -691,6 +698,7 @@
 				193AA89B28CCD34A00FF7EB6 /* Resources.swift in Sources */,
 				1919FBE929CF78BE00FEF570 /* Explore.swift in Sources */,
 				2AA1B2C32F5A6B7C00D1E2F3 /* MemoView.swift in Sources */,
+				3832F25008B04FA7AB2BA0AB /* MemosMemoActions.swift in Sources */,
 				AA1000000000000000000002 /* MemoCommentsViewModel.swift in Sources */,
 				AA1000000000000000000004 /* MemoComments.swift in Sources */,
 			);
@@ -761,7 +769,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos.MoeMemosWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -795,7 +803,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos.MoeMemosWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -960,7 +968,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1001,7 +1009,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1033,7 +1041,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos.MoeMemosShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1065,7 +1073,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = me.mudkip.MoeMemos.MoeMemosShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

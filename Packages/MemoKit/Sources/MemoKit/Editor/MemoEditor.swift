@@ -75,7 +75,7 @@ public struct MemoEditor: View {
             accountKey: accountKey,
             memoID: memo?.id
         )
-        let resources = memo?.resources.filter { !$0.softDeleted }.sorted { $0.createdAt > $1.createdAt } ?? []
+        let resources = memo?.orderedResources.filter { !$0.softDeleted } ?? []
         let original = MemoDraft(
             text: memo?.content ?? "",
             visibility: memo?.visibility ?? accountManager.currentUser?.defaultVisibility ?? .private,
@@ -292,6 +292,10 @@ public struct MemoEditor: View {
             } catch {
                 print(error)
             }
+        }
+        .task(id: draftStore?.accountKey) {
+            guard isCurrentAccount else { return }
+            await viewModel.loadWriteLimits()
         }
         .onDisappear {
             persistDraft()
@@ -534,6 +538,9 @@ public struct MemoEditor: View {
         let tags = viewModel.extractCustomTags(from: text)
 
         do {
+            if text != memo?.content {
+                try viewModel.validateContent(text)
+            }
             let resourceIds = viewModel.resourceList.map(\.id)
             if let memo = memo {
                 try await actions.editMemo(memo.id, text, viewModel.visibility, resourceIds, tags, viewModel.location)
@@ -579,7 +586,8 @@ public struct MemoEditor: View {
     }
 
     private var availableVisibilities: [MemoVisibility] {
-        accountManager.currentService?.memoVisibilities() ?? [.private]
+        let available = accountManager.currentService?.memoVisibilities() ?? [.private]
+        return memo?.visibility == .space ? available + [.space] : available
     }
 
     private var supportsJournalingSuggestions: Bool {

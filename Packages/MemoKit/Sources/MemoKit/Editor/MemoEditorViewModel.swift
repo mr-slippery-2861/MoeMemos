@@ -25,6 +25,19 @@ import SwiftData
         }
     }
 
+    private var writeLimits: MemoWriteLimits?
+
+    func loadWriteLimits() async {
+        guard let remote = accountManager.currentRemoteService as? MemoWritePolicyService else { return }
+        let limits = try? await remote.memoWriteLimits()
+        guard !Task.isCancelled, accountManager.currentAccount?.key == accountKey else { return }
+        writeLimits = limits
+    }
+
+    func validateContent(_ content: String) throws {
+        try writeLimits?.validate(content: content)
+    }
+
     public var resourceList = [StoredResource]()
     public var location: MemoLocation?
     public var supportsLocations: Bool { (try? service.supportsMemoLocations) == true }
@@ -81,6 +94,7 @@ import SwiftData
     }
 
     private func validateUploadSize(_ size: Int64) throws {
+        try writeLimits?.validate(uploadSize: size)
         if size > Self.maxUploadSizeBytes {
             throw MoeMemosError.fileTooLarge(Self.maxUploadSizeBytes)
         }

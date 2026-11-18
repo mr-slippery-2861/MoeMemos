@@ -31,6 +31,8 @@ extension Route {
             Settings()
         case .explore:
             Explore()
+        case .memosWorkspace:
+            MemosWorkspaceView()
         case .memosAccount(let accountKey):
             AccountDetailView(accountKey: accountKey)
         case .memo(let memoId):

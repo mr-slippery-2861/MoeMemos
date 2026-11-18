@@ -12,6 +12,7 @@ public enum MoeMemosError: LocalizedError {
     case notLogin
     case invalidStatusCode(Int, String?)
     case invalidParams
+    case memoTooLong(Int)
     case fileTooLarge(Int64)
     case locationUnsupported
     case unsupportedVersion
@@ -31,6 +32,8 @@ public enum MoeMemosError: LocalizedError {
             return "Network error."
         case .invalidParams:
             return "Please enter a valid input."
+        case .memoTooLong(let maxBytes):
+            return "Memo exceeds the server’s limit of \(maxBytes) UTF-8 bytes."
         case .fileTooLarge(let maxBytes):
             return "File is too large. Max size is \(formatByteCount(maxBytes))."
         case .locationUnsupported:
@@ -46,7 +49,6 @@ public enum MoeMemosError: LocalizedError {
 
     private func formatByteCount(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useGB]
         formatter.countStyle = .binary
         return formatter.string(fromByteCount: bytes)
     }

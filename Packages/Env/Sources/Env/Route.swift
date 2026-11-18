@@ -17,6 +17,7 @@ public enum Route: Hashable {
     case tag(Tag)
     case settings
     case explore
+    case memosWorkspace
     case memosAccount(String)
     case memo(PersistentIdentifier)
 }

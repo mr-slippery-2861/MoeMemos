@@ -128,7 +128,7 @@ struct MemoCard: View {
     private func toggleTaskItem(_ updatedContent: String) {
         let memoID = memo.id
         let visibility = memo.visibility
-        let resourceIds = memo.resources.filter { !$0.softDeleted }.map(\.id)
+        let resourceIds = memo.orderedResources.filter { !$0.softDeleted }.map(\.id)
 
         Task {
             do {

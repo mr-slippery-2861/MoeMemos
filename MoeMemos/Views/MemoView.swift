@@ -25,6 +25,9 @@ struct MemoView: View {
     @Environment(AppPath.self) private var appPath
     @Environment(\.dismiss) private var dismiss
 
+    @State private var canMoveToSpace = false
+    @State private var showingPlacement = false
+    @State private var showingShareLinks = false
     @State private var showingDeleteConfirmation = false
     @State private var commentsViewModel: MemoCommentsViewModel?
 
@@ -68,6 +71,12 @@ struct MemoView: View {
                             },
                             textSelectionEnabled: true
                         )
+
+                        if let service = accountManager.currentRemoteService as? MemosWorkspaceService,
+                           let name = memo.serverId {
+                            MemoReactionsRow(service: service, memo: name)
+                                .id(name)
+                        }
 
                         if commentsEnabled, let commentsViewModel {
                             Divider()
@@ -113,6 +122,13 @@ struct MemoView: View {
                 print(error)
             }
         }
+        .task(id: accountManager.currentAccount?.key) {
+            canMoveToSpace = false
+            if let service = accountManager.currentRemoteService as? MemosWorkspaceService {
+                let supported = (try? await service.supportsCollections()) == true
+                if !Task.isCancelled { canMoveToSpace = supported }
+            }
+        }
         .navigationTitle(memo?.renderTime() ?? "Memo")
         .memoEntity(memo)
         .navigationBarTitleDisplayMode(.inline)
@@ -126,6 +142,25 @@ struct MemoView: View {
                             .labelStyle(.iconOnly)
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingPlacement) {
+            if let service = accountManager.currentRemoteService as? MemosWorkspaceService,
+               let memo, let name = memo.serverId {
+                NavigationStack {
+                    MemoPlacementEditor(service: service, memo: name) { space, visibility in
+                        guard memo.syncState == .synced, accountManager.currentAccount?.key == memo.accountKey else {
+                            throw MoeMemosError.invalidParams
+                        }
+                        try await service.updateMemoPlacement(memo: name, space: space, visibility: visibility)
+                        try? await memosViewModel.syncNow()
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingShareLinks) {
+            if let service = accountManager.currentRemoteService as? MemosWorkspaceService, let name = memo?.serverId {
+                NavigationStack { MemoShareLinks(service: service, memo: name) }
             }
         }
         .confirmationDialog("memo.delete.confirm", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
@@ -172,6 +207,18 @@ struct MemoView: View {
         ShareLink(item: memo.content) {
             Label("memo.share", systemImage: "square.and.arrow.up")
         }
+        if let service = accountManager.currentRemoteService as? MemosWorkspaceService,
+           let name = memo.serverId {
+            Link(destination: service.webURL.appending(path: name)) {
+                Label("Edit rich text and Markup in Memos", systemImage: "safari")
+            }
+            if canMoveToSpace, memo.syncState == .synced {
+                Button("Space and audience", systemImage: "person.2") { showingPlacement = true }
+            }
+            if memo.rowStatus == .normal && memo.visibility != .space {
+                Button("Share links", systemImage: "link") { showingShareLinks = true }
+            }
+        }
         Button(role: .destructive, action: {
             Task {
                 do {
@@ -194,7 +241,7 @@ struct MemoView: View {
     private func toggleTaskItem(_ updatedContent: String, for memo: StoredMemo) {
         let memoID = memo.id
         let visibility = memo.visibility
-        let resourceIds = memo.resources.filter { !$0.softDeleted }.map(\.id)
+        let resourceIds = memo.orderedResources.filter { !$0.softDeleted }.map(\.id)
 
         Task {
             do {

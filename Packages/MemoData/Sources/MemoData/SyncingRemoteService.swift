@@ -88,11 +88,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
 
         stored.location = location
 
-        for resourceId in resources {
-            if let resource = store.fetchResource(id: resourceId) {
-                resource.memo = stored
-            }
-        }
+        store.setResources(resources, for: stored)
 
         try store.save()
 
@@ -126,16 +122,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         if let pinned { stored.pinned = pinned }
 
         if let resources {
-            let desired = Set(resources)
-            let existing = stored.resources
-            for res in existing where !desired.contains(res.persistentModelID) {
-                res.memo = nil
-            }
-            for resourceId in resources {
-                if let res = store.fetchResource(id: resourceId) {
-                    res.memo = stored
-                }
-            }
+            store.setResources(resources, for: stored)
         }
 
         stored.updatedAt = .now
@@ -591,7 +578,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
     }
 
     private func memoFromStored(_ stored: StoredMemo) -> Memo {
-        let resources = stored.resources
+        let resources = stored.orderedResources
             .filter { $0.accountKey == accountKey && !$0.softDeleted }
             .compactMap { $0.toResource() }
         return Memo(
@@ -624,7 +611,6 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
             }
             return resource.url.absoluteString
         }
-        .sorted()
     }
 
     private func applyRemoteMemo(_ memo: Memo, syncedAt: Date) {
@@ -652,10 +638,10 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
 
         duplicated.location = local.location
 
-        let resources = local.resources
+        let resources = local.orderedResources
             .filter { $0.accountKey == accountKey && !$0.softDeleted }
         for res in resources {
-            _ = store.createLocalResource(
+            let copy = store.createLocalResource(
                 serverId: res.serverId,
                 filename: res.filename,
                 size: res.size,
@@ -669,6 +655,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
                 syncState: res.serverId == nil ? .pendingCreate : .synced,
                 lastSyncedAt: res.lastSyncedAt
             )
+            copy.memoPosition = res.memoPosition
         }
         try store.save()
 
@@ -741,14 +728,14 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
     }
 
     private func ensureUploadedResources(for local: StoredMemo, memoServerId: String?) async throws -> [Resource] {
-        let storedResources = local.resources
+        let storedResources = local.orderedResources
             .filter { $0.accountKey == accountKey && !$0.softDeleted }
 
         for res in storedResources where res.serverId == nil && res.syncState != .pendingDelete {
             _ = try await pushLocalResourceCreate(local: res, memoServerId: memoServerId)
         }
 
-        return local.resources
+        return local.orderedResources
             .filter { $0.accountKey == accountKey && !$0.softDeleted }
             .compactMap { $0.toResource() }
             .filter { $0.remoteId != nil }

@@ -40,6 +40,11 @@ struct Sidebar: View {
                         Label("explore", systemImage: "house")
                     }
                 }
+                if accountManager.currentRemoteService is MemosWorkspaceService {
+                    NavigationLink(value: Route.memosWorkspace) {
+                        Label("Memos Workspace", systemImage: "square.grid.2x2")
+                    }
+                }
                 NavigationLink(value: Route.resources) {
                     Label("resources", systemImage: "photo.on.rectangle")
                 }

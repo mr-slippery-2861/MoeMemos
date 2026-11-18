@@ -53,6 +53,15 @@ public final class StoredMemo {
     @Relationship(deleteRule: .cascade, inverse: \StoredResource.memo)
     public var resources: [StoredResource]
 
+    public var orderedResources: [StoredResource] {
+        resources.sorted {
+            let leftPosition = $0.memoPosition ?? Int.max
+            let rightPosition = $1.memoPosition ?? Int.max
+            if leftPosition != rightPosition { return leftPosition < rightPosition }
+            return $0.createdAt > $1.createdAt
+        }
+    }
+
     public init(
         accountKey: String,
         serverId: String? = nil,
@@ -97,6 +106,7 @@ public final class StoredResource {
     public var urlString: String
     public var localPath: String?
     public var memo: StoredMemo?
+    public var memoPosition: Int? = nil
     public var softDeleted: Bool
     public var syncState: SyncState
     public var lastSyncedAt: Date?

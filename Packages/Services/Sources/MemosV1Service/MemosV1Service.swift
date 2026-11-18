@@ -13,12 +13,13 @@ import Models
 import ServiceUtils
 
 @MainActor
-public final class MemosV1Service: RemoteService, MemoCommentService {
+public final class MemosV1Service: RemoteService, MemoCommentService, MemoWritePolicyService, MemosWorkspaceService {
     private let hostURL: URL
     private let urlSession: URLSession
     private let client: Client
     private let accessToken: String?
     private let userId: String?
+    private var detectedVersion: SemanticVersion?
     private let grpcSetCookieMiddleware = GRPCSetCookieMiddleware()
     
     public nonisolated init(hostURL: URL, accessToken: String?, userId: String?, transport: (any ClientTransport)? = nil) {
@@ -205,12 +206,21 @@ public final class MemosV1Service: RemoteService, MemoCommentService {
     }
     
     public func listResources() async throws -> [Resource] {
-        let resp = try await client.AttachmentService_ListAttachments()
-        let data = try resp.ok.body.json
-        return data.attachments?.map { $0.toResource(host: hostURL) } ?? []
+        var resources: [Resource] = []
+        var pageToken: String?
+        repeat {
+            let resp = try await client.AttachmentService_ListAttachments(query: .init(pageSize: 100, pageToken: pageToken))
+            let data = try resp.ok.body.json
+            resources += data.attachments?.map { $0.toResource(host: hostURL) } ?? []
+            pageToken = data.nextPageToken
+        } while pageToken?.isEmpty == false
+        return resources
     }
-    
+
     public func createResource(filename: String, data: Data, type: String, memoRemoteId: String?) async throws -> Resource {
+        if data.count > 1_048_576, (try? await usesCalendarAPI()) == true {
+            return try await uploadInChunks(filename: filename, data: data, type: type, memoRemoteId: memoRemoteId)
+        }
         let resp = try await client.AttachmentService_CreateAttachment(body: .json(.init(
             filename: filename,
             content: .init(data),
@@ -254,9 +264,11 @@ public final class MemosV1Service: RemoteService, MemoCommentService {
     
     public func getWorkspaceProfile() async throws -> MemosV1Profile {
         let resp = try await client.InstanceService_GetInstanceProfile()
-        return try resp.ok.body.json
+        let profile = try resp.ok.body.json
+        detectedVersion = profile.version.flatMap(SemanticVersion.init)
+        return profile
     }
-    
+
     public func download(url: URL, mimeType: String? = nil) async throws -> URL {
         return try await ServiceUtils.download(urlSession: urlSession, url: url, mimeType: mimeType, middleware: rawAccessTokenMiddlware(hostURL: hostURL, accessToken: accessToken))
     }
@@ -323,5 +335,191 @@ public final class MemosV1Service: RemoteService, MemoCommentService {
         }
         snapshot.isAdmin = memosUser.role == .ADMIN
         return snapshot
+    }
+}
+
+extension MemosV1Service {
+    public var webURL: URL { hostURL }
+
+    public func supportsCollections() async throws -> Bool {
+        try await version() >= SemanticVersion("0.31.0")!
+    }
+
+    public func memoWriteLimits() async throws -> MemoWriteLimits {
+        guard let userId else { throw MoeMemosError.notLogin }
+        if try await usesCalendarAPI() {
+            let result = try await client.UserService_GetUserUsage(path: .init(user: userId))
+            let limits = try result.ok.body.json.limits
+            return MemoWriteLimits(
+                contentBytes: limits?.memoContentBytes.flatMap(Int.init),
+                uploadBytes: limits?.uploadBytes.flatMap(Int64.init)
+            )
+        }
+
+        let result = try await client.InstanceService_GetInstanceSetting(path: .init(setting: "MEMO_RELATED"))
+        let contentBytes = try result.ok.body.json.memoRelatedSetting?.contentLengthLimit.map(Int.init)
+        // Legacy storage settings may require instance administrator privileges.
+        let storage = try? await client.InstanceService_GetInstanceSetting(path: .init(setting: "STORAGE"))
+        let megabytes = try? storage?.ok.body.json.storageSetting?.uploadSizeLimitMb.flatMap(Int64.init)
+        let uploadBytes = megabytes.flatMap { size -> Int64? in
+            let (bytes, overflow) = size.multipliedReportingOverflow(by: 1_048_576)
+            return overflow ? nil : bytes
+        }
+        return MemoWriteLimits(contentBytes: contentBytes, uploadBytes: uploadBytes)
+    }
+
+    public func listSpaces() async throws -> [MemosSpace] {
+        var spaces: [MemosSpace] = []
+        var pageToken: String?
+        repeat {
+            let result = try await client.SpaceService_ListSpaces(query: .init(pageSize: 100, pageToken: pageToken))
+            let page = try result.ok.body.json
+            spaces += (page.spaces ?? []).compactMap { space in
+                guard let name = space.name, let title = space.title else { return nil }
+                return MemosSpace(id: name, title: title, emoji: space.icon?.emoji)
+            }
+            pageToken = page.nextPageToken
+        } while pageToken?.isEmpty == false
+        return spaces
+    }
+
+    public func createSpace(title: String, description: String) async throws {
+        let result = try await client.SpaceService_CreateSpace(body: .json(.init(title: title, description: description)))
+        _ = try result.ok
+    }
+
+    public func memoPlacement(memo: String) async throws -> (space: String?, visibility: MemoVisibility) {
+        let result = try await client.MemoService_GetMemo(path: .init(memo: getId(remoteId: memo)))
+        let value = try result.ok.body.json
+        return (value.space, value.visibility?.toMemoVisibility() ?? .private)
+    }
+
+    public func updateMemoPlacement(memo: String, space: String?, visibility: MemoVisibility) async throws {
+        guard visibility != .space || space != nil else { throw MoeMemosError.invalidParams }
+        let result = try await client.MemoService_UpdateMemo(
+            path: .init(memo: getId(remoteId: memo)),
+            query: .init(updateMask: "space,visibility"),
+            body: .json(.init(space: space ?? "", visibility: .init(memoVisibility: visibility)))
+        )
+        _ = try result.ok
+    }
+
+    public func listSavedViews() async throws -> [SavedMemosView] {
+        guard let userId else { throw MoeMemosError.notLogin }
+        let result = try await client.UserService_ListMemoViews(path: .init(user: userId))
+        return try (result.ok.body.json.memoViews ?? []).compactMap { view in
+            guard let name = view.name, let title = view.title, let filter = view.filter else { return nil }
+            return SavedMemosView(id: name, title: title, filter: filter, emoji: view.icon?.emoji)
+        }
+    }
+
+    public func saveView(id: String?, title: String, filter: String) async throws {
+        guard let userId else { throw MoeMemosError.notLogin }
+        let body = Components.Schemas.SavedMemoView(title: title, filter: filter)
+        if let id {
+            let result = try await client.UserService_UpdateMemoView(
+                path: .init(user: userId, view: getId(remoteId: id)),
+                query: .init(updateMask: "title,filter"), body: .json(body)
+            )
+            _ = try result.ok
+        } else {
+            let result = try await client.UserService_CreateMemoView(path: .init(user: userId), body: .json(body))
+            _ = try result.ok
+        }
+    }
+
+    public func deleteView(id: String) async throws {
+        guard let userId else { throw MoeMemosError.notLogin }
+        let result = try await client.UserService_DeleteMemoView(path: .init(user: userId, view: getId(remoteId: id)))
+        _ = try result.ok
+    }
+
+    public func listMemos(filter: String?, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?) {
+        let result = try await client.MemoService_ListMemos(query: .init(pageSize: 30, pageToken: pageToken, state: .NORMAL, filter: filter))
+        let page = try result.ok.body.json
+        return ((page.memos ?? []).map { $0.toMemo(host: hostURL) }, page.nextPageToken.flatMap { $0.isEmpty ? nil : $0 })
+    }
+
+    public func listReactions(memo: String) async throws -> [MemoReaction] {
+        let result = try await client.MemoService_ListMemoReactions(path: .init(memo: getId(remoteId: memo)))
+        return try (result.ok.body.json.reactions ?? []).compactMap { reaction in
+            guard let name = reaction.name else { return nil }
+            let isMine = userId.map { reaction.creator == "users/\($0)" } ?? false
+            return MemoReaction(id: name, emoji: reaction.reactionType, isMine: isMine)
+        }
+    }
+
+    public func toggleReaction(memo: String, emoji: String, existing: MemoReaction?) async throws {
+        let memoID = getId(remoteId: memo)
+        if let existing, existing.isMine {
+            let result = try await client.MemoService_DeleteMemoReaction(path: .init(memo: memoID, reaction: getId(remoteId: existing.id)))
+            _ = try result.ok
+        } else {
+            let result = try await client.MemoService_UpsertMemoReaction(
+                path: .init(memo: memoID), body: .json(.init(reaction: .init(value1: .init(reactionType: emoji))))
+            )
+            _ = try result.ok
+        }
+    }
+
+    public func listShareLinks(memo: String) async throws -> [MemoShareLink] {
+        let result = try await client.MemoService_ListMemoShares(path: .init(memo: getId(remoteId: memo)))
+        return try (result.ok.body.json.memoShares ?? []).compactMap { share in
+            guard let name = share.name else { return nil }
+            let url = hostURL.appending(path: "memos/shares").appending(component: getId(remoteId: name))
+            return MemoShareLink(id: name, url: url, expiry: share.expireTime)
+        }
+    }
+
+    public func createShareLink(memo: String, expires: Date?) async throws {
+        let result = try await client.MemoService_CreateMemoShare(
+            path: .init(memo: getId(remoteId: memo)), body: .json(.init(expireTime: expires))
+        )
+        _ = try result.ok
+    }
+
+    public func revokeShareLink(memo: String, share: String) async throws {
+        let result = try await client.MemoService_DeleteMemoShare(
+            path: .init(memo: getId(remoteId: memo), share: getId(remoteId: share))
+        )
+        _ = try result.ok
+    }
+
+    private func version() async throws -> SemanticVersion {
+        if let detectedVersion { return detectedVersion }
+        _ = try await getWorkspaceProfile()
+        guard let detectedVersion else { throw MoeMemosError.unsupportedVersion }
+        return detectedVersion
+    }
+
+    private func usesCalendarAPI() async throws -> Bool {
+        try await version() >= SemanticVersion(SupportedMemosVersion.minimumCalendar)!
+    }
+
+    private func uploadInChunks(filename: String, data: Data, type: String, memoRemoteId: String?) async throws -> Resource {
+        let attachment = MemosV1Resource(filename: filename, _type: type, memo: memoRemoteId.map(getName(remoteId:)))
+        let start = try await client.AttachmentService_UploadAttachment(body: .json(.init(
+            spec: .init(attachment: attachment, totalSize: String(data.count)), writeOffset: "0"
+        )))
+        let session = try start.ok.body.json
+        guard let id = session.uploadId, let maximum = session.maxChunkSize, maximum > 0 else {
+            throw MoeMemosError.unknown
+        }
+        var offset = 0
+        while offset < data.count {
+            try Task.checkCancellation()
+            let end = offset + min(data.count - offset, Int(maximum), 1_048_576)
+            let chunk = data.subdata(in: (data.startIndex + offset)..<(data.startIndex + end))
+            let result = try await client.AttachmentService_UploadAttachment(body: .json(.init(
+                uploadId: id, writeOffset: String(offset), data: .init(chunk), finishWrite: end == data.count
+            )))
+            let progress = try result.ok.body.json
+            if end == data.count, let finished = progress.attachment {
+                return finished.toResource(host: hostURL)
+            }
+            guard progress.committedSize.flatMap(Int.init) == end else { throw MoeMemosError.unknown }
+            offset = end
+        }
+        throw MoeMemosError.unknown
     }
 }
