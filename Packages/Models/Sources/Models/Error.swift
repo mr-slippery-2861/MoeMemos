@@ -12,6 +12,7 @@ public enum MoeMemosError: LocalizedError {
     case notLogin
     case invalidStatusCode(Int, String?)
     case invalidParams
+    case memoChangedRemotely
     case memoTooLong(Int)
     case fileTooLarge(Int64)
     case locationUnsupported
@@ -32,6 +33,8 @@ public enum MoeMemosError: LocalizedError {
             return "Network error."
         case .invalidParams:
             return "Please enter a valid input."
+        case .memoChangedRemotely:
+            return "The server has a newer version of this memo. Sync to reconcile both edits."
         case .memoTooLong(let maxBytes):
             return "Memo exceeds the server’s limit of \(maxBytes) UTF-8 bytes."
         case .fileTooLarge(let maxBytes):

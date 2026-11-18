@@ -531,7 +531,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
 
         if !remoteChanged {
             do {
-                let updated = try await pushLocalMemo(local: local, tags: nil)
+                let updated = try await pushLocalMemo(local: local, tags: nil, remoteSnapshot: remote)
                 applyRemoteMemo(updated, syncedAt: syncedAt)
                 try store.save()
             } catch {
@@ -541,7 +541,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         }
 
         // Both changed.
-        _ = try? await createDuplicateFromLocal(local, syncedAt: syncedAt)
+        _ = try? await createDuplicateFromLocal(local)
         applyRemoteMemo(remote, syncedAt: syncedAt)
     }
 
@@ -622,13 +622,14 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         store.reconcileResources(memo.resources, to: stored, preserveLocalOnly: true)
     }
 
-    private func createDuplicateFromLocal(_ local: StoredMemo, syncedAt: Date) async throws -> StoredMemo {
+    private func createDuplicateFromLocal(_ local: StoredMemo) async throws -> StoredMemo {
         let duplicated = store.createLocalMemo(
             serverId: nil,
             content: local.content,
             pinned: local.pinned,
             rowStatus: local.rowStatus,
-            visibility: local.visibility,
+            // A conflict copy can contain content whose audience was just restricted on the server.
+            visibility: .private,
             createdAt: local.createdAt,
             updatedAt: local.updatedAt,
             softDeleted: false,
@@ -680,11 +681,11 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
 
     // MARK: - Push Helpers
 
-    private func pushLocalMemo(local: StoredMemo, tags: [String]?) async throws -> Memo {
+    private func pushLocalMemo(local: StoredMemo, tags: [String]?, remoteSnapshot: Memo? = nil) async throws -> Memo {
         if local.serverId == nil || local.syncState == .pendingCreate {
             return try await pushLocalCreate(local: local, tags: tags)
         }
-        return try await pushLocalUpdate(local: local, tags: tags)
+        return try await pushLocalUpdate(local: local, tags: tags, remoteSnapshot: remoteSnapshot)
     }
 
     private func pushLocalCreate(local: StoredMemo, tags: [String]?) async throws -> Memo {
@@ -708,20 +709,34 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         return created
     }
 
-    private func pushLocalUpdate(local: StoredMemo, tags: [String]?) async throws -> Memo {
+    private func pushLocalUpdate(local: StoredMemo, tags: [String]?, remoteSnapshot: Memo?) async throws -> Memo {
         guard let serverId = local.serverId else { throw MoeMemosError.invalidParams }
+        var current = remoteSnapshot
+        if current == nil, let reader = remote as? RemoteMemoReading {
+            let fetched = try await reader.readMemo(remoteId: serverId)
+            if hasRemoteChanged(local: local, remote: fetched) {
+                if memoEquivalent(memoFromStored(local), fetched) {
+                    applyRemoteMemo(fetched, syncedAt: fetched.updatedAt)
+                    return fetched
+                }
+                // Let full sync reconcile divergent edits without replacing the remote audience.
+                throw MoeMemosError.memoChangedRemotely
+            }
+            current = fetched
+        }
         let resources = try await ensureUploadedResources(for: local, memoServerId: serverId)
-
         let memo = memoFromStored(local)
+        let attachmentsChanged = current.map { resourceSignature($0.resources) != resourceSignature(resources) } ?? true
+        let locationChanged = current.map { $0.location != memo.location } ?? true
         let updated = try await remote.updateMemo(
             remoteId: serverId,
-            content: memo.content,
-            resources: resources,
-            visibility: memo.visibility,
+            content: current?.content == memo.content ? nil : memo.content,
+            resources: attachmentsChanged ? resources : nil,
+            visibility: current?.visibility == memo.visibility ? nil : memo.visibility,
             tags: tags,
-            pinned: memo.pinned,
+            pinned: current?.pinned == memo.pinned ? nil : memo.pinned,
             updatedAt: local.updatedAt,
-            location: supportsMemoLocations ? memo.location.map(MemoLocationUpdate.set) ?? .remove : nil
+            location: supportsMemoLocations && locationChanged ? memo.location.map(MemoLocationUpdate.set) ?? .remove : nil
         )
         applyRemoteMemo(updated, syncedAt: updated.updatedAt)
         return updated

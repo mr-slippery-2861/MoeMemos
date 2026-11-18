@@ -57,10 +57,14 @@ public actor LocalBackupService {
         for resource in allResources where resource.backupId == nil { resource.backupId = UUID().uuidString.lowercased() }
         try context.save()
         let memos = allMemos.filter { !$0.softDeleted }.sorted { $0.createdAt < $1.createdAt }
-        let memoIds = Set(memos.compactMap(\.backupId))
-        let resources = allResources.filter { resource in
-            !resource.softDeleted && (resource.memo == nil || resource.memo?.backupId.map { memoIds.contains($0) } == true)
-        }.sorted { $0.createdAt < $1.createdAt }
+        // V1 already stores an ordered attachment array. Write each memo's
+        // attachments back-to-front so legacy archives (oldest first) restore
+        // with the same newest-first order they previously displayed.
+        let attached = memos.flatMap { $0.orderedResources.reversed() }
+            .filter { $0.accountKey == accountKey && !$0.softDeleted }
+        let unattached = allResources.filter { !$0.softDeleted && $0.memo == nil }
+            .sorted { $0.createdAt < $1.createdAt }
+        let resources = attached + unattached
         let records = memos.enumerated().map { index, memo in
             LocalBackupMemo(id: memo.backupId!, contentFile: "memos/\(index).md",
                 createdAt: LocalBackupArchive.timestamp(memo.createdAt), updatedAt: LocalBackupArchive.timestamp(memo.updatedAt),
@@ -125,7 +129,8 @@ public actor LocalBackupService {
             inserted[memo.id] = stored
         }
         var importedAttachments = 0
-        for attachment in data.manifest.attachments {
+        var attachmentPositions: [String: Int] = [:]
+        for attachment in data.manifest.attachments.reversed() {
             if let memoId = attachment.memoId, inserted[memoId] == nil { continue }
             // Resource identities are account-wide. Never overwrite an existing
             // attachment, including an unattached resource or a tombstone.
@@ -145,6 +150,10 @@ public actor LocalBackupService {
             let resource = StoredResource(accountKey: accountKey, filename: attachment.filename, size: Int(attachment.size),
                 mimeType: mimeType, createdAt: createdAt, updatedAt: createdAt, urlString: destination.absoluteString,
                 localPath: destination.path, memo: attachment.memoId.flatMap { inserted[$0] })
+            if let memoId = attachment.memoId {
+                resource.memoPosition = attachmentPositions[memoId, default: 0]
+                attachmentPositions[memoId, default: 0] += 1
+            }
             resource.backupId = attachment.id
             context.insert(resource)
             importedAttachments += 1

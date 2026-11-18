@@ -57,12 +57,14 @@ final class LocalMemoListingTests: XCTestCase {
         store.reconcileResources([first, second], to: memo)
         try store.save()
         let id = memo.persistentModelID
-        let reloaded = try XCTUnwrap(ModelContext(container).model(for: id) as? StoredMemo)
+        let firstReload = ModelContext(container)
+        let reloaded = try XCTUnwrap(firstReload.model(for: id) as? StoredMemo)
         XCTAssertEqual(reloaded.orderedResources.map(\.filename), ["first.txt", "second.txt"])
 
         store.setResources(Array(memo.orderedResources.reversed()).map(\.persistentModelID), for: memo)
         try store.save()
-        let reordered = try XCTUnwrap(ModelContext(container).model(for: id) as? StoredMemo)
+        let secondReload = ModelContext(container)
+        let reordered = try XCTUnwrap(secondReload.model(for: id) as? StoredMemo)
         XCTAssertEqual(reordered.orderedResources.map(\.filename), ["second.txt", "first.txt"])
     }
 

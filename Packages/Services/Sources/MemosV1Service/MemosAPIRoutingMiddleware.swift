@@ -12,6 +12,17 @@ actor MemosAPIRoutingMiddleware: ClientMiddleware {
         operationID: String,
         next: (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
+        try await route(request, body: body, baseURL: baseURL, operationID: operationID, retryRead: true, next: next)
+    }
+
+    private func route(
+        _ request: HTTPRequest,
+        body: HTTPBody?,
+        baseURL: URL,
+        operationID: String,
+        retryRead: Bool,
+        next: (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
+    ) async throws -> (HTTPResponse, HTTPBody?) {
         if usesUnversionedAPI == nil {
             var profileRequest = request
             profileRequest.method = .get
@@ -34,11 +45,21 @@ actor MemosAPIRoutingMiddleware: ClientMiddleware {
             }
         }
 
-        var request = request
-        if usesUnversionedAPI == true, let path = request.path, path.hasPrefix("/api/v1/") {
-            request.path = "/api/" + path.dropFirst("/api/v1/".count)
+        var routedRequest = request
+        let versioned = usesUnversionedAPI == false
+        if !versioned, let path = request.path, path.hasPrefix("/api/v1/") {
+            routedRequest.path = "/api/" + path.dropFirst("/api/v1/".count)
         }
-        return try await next(request, body, baseURL)
+        let result = try await next(routedRequest, body, baseURL)
+        if versioned, result.0.status == .gone {
+            // A live upgrade can remove previously negotiated routes. Re-probe;
+            // leave writes to the existing pending-operation retry.
+            if usesUnversionedAPI == false { usesUnversionedAPI = nil }
+            if retryRead, request.method == .get {
+                return try await route(request, body: body, baseURL: baseURL, operationID: operationID, retryRead: false, next: next)
+            }
+        }
+        return result
     }
 
     private func isHTML(_ response: HTTPResponse) -> Bool {

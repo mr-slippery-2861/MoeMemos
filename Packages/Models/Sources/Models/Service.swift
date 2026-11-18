@@ -45,6 +45,11 @@ public protocol RemoteService: Sendable {
     func download(url: URL, mimeType: String?) async throws -> URL
 }
 
+@MainActor
+public protocol RemoteMemoReading: RemoteService {
+    func readMemo(remoteId: String) async throws -> Memo
+}
+
 /// Remote services that support memo comments (Memos v1 API).
 @MainActor
 public protocol MemoCommentService: RemoteService {

@@ -83,6 +83,18 @@ final class MemosCalendarVersionTests: XCTestCase {
         XCTAssertTrue(requests.last?.path?.hasPrefix("/api/memos") == true)
     }
 
+    func testOpenClientDiscoversNewRoutesAfterServerUpgrade() async throws {
+        let transport = CompatibilityTransport(version: "0.28.0")
+        let service = MemosV1Service(hostURL: URL(string: "https://memos.example")!, accessToken: nil, userId: "alice", transport: transport)
+        _ = try await service.getWorkspaceProfile()
+        await transport.upgrade()
+        let memos = try await service.listMemos()
+        XCTAssertEqual(memos.map(\.content), ["Memo"])
+        let paths = await transport.requests.compactMap(\.path)
+        XCTAssertEqual(paths.filter { $0 == "/api/v1/instance/profile" }.count, 2)
+        XCTAssertTrue(paths.last?.hasPrefix("/api/memos") == true)
+    }
+
     func testProfileErrorsDoNotTriggerFallbackOrWrites() async throws {
         for status in [HTTPResponse.Status.unauthorized, .internalServerError] {
             let transport = CompatibilityTransport(version: "26.11.0", legacyStatus: status)
@@ -103,6 +115,7 @@ final class MemosCalendarVersionTests: XCTestCase {
 private actor CompatibilityTransport: ClientTransport {
     let version: String
     let legacyStatus: HTTPResponse.Status?
+    private var upgraded = false
     var requests = [HTTPRequest]()
     var writes = [Data]()
     var baseURLs = [URL]()
@@ -112,9 +125,14 @@ private actor CompatibilityTransport: ClientTransport {
         self.legacyStatus = legacyStatus
     }
 
+    func upgrade() { upgraded = true }
+
     func send(_ request: HTTPRequest, body: HTTPBody?, baseURL: URL, operationID: String) async throws -> (HTTPResponse, HTTPBody?) {
         requests.append(request)
         baseURLs.append(baseURL)
+        if upgraded, request.path?.hasPrefix("/api/v1/") == true {
+            return response(["code": 12], status: .gone)
+        }
         if request.path == "/api/v1/instance/profile", let legacyStatus {
             if legacyStatus == .ok {
                 return (HTTPResponse(status: .ok, headerFields: [.contentType: "text/html"]), HTTPBody("<html></html>"))
@@ -122,7 +140,7 @@ private actor CompatibilityTransport: ClientTransport {
             return response(["code": 12, "message": "Legacy route unavailable"], status: legacyStatus)
         }
         if request.path?.hasSuffix("/instance/profile") == true {
-            return response(["version": version])
+            return response(["version": upgraded ? "26.11.1" : version])
         }
         if let body {
             let data = try await Data(collecting: body, upTo: 1_000_000)

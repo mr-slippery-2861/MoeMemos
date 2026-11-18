@@ -13,7 +13,7 @@ import Models
 import ServiceUtils
 
 @MainActor
-public final class MemosV1Service: RemoteService, MemoCommentService, MemoWritePolicyService, MemosWorkspaceService {
+public final class MemosV1Service: RemoteService, RemoteMemoReading, MemoCommentService, MemoWritePolicyService, MemosWorkspaceService {
     private let hostURL: URL
     private let urlSession: URLSession
     private let client: Client
@@ -74,6 +74,11 @@ public final class MemosV1Service: RemoteService, MemoCommentService, MemoWriteP
         return memos
     }
     
+    public func readMemo(remoteId: String) async throws -> Memo {
+        let result = try await client.MemoService_GetMemo(path: .init(memo: getId(remoteId: remoteId)))
+        return try result.ok.body.json.toMemo(host: hostURL)
+    }
+
     public func listWorkspaceMemos(pageSize: Int, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?) {
         let resp = try await client.MemoService_ListMemos(query: .init(pageSize: Int32(pageSize), pageToken: pageToken, filter: "visibility in [\"PUBLIC\", \"PROTECTED\"]"))
         let data = try resp.ok.body.json
@@ -396,10 +401,12 @@ extension MemosV1Service {
 
     public func updateMemoPlacement(memo: String, space: String?, visibility: MemoVisibility) async throws {
         guard visibility != .space || space != nil else { throw MoeMemosError.invalidParams }
+        let current = try await readMemo(remoteId: memo)
+        let updateTime = max(.now, current.updatedAt.addingTimeInterval(1))
         let result = try await client.MemoService_UpdateMemo(
             path: .init(memo: getId(remoteId: memo)),
-            query: .init(updateMask: "space,visibility"),
-            body: .json(.init(space: space ?? "", visibility: .init(memoVisibility: visibility)))
+            query: .init(updateMask: "space,visibility,update_time"),
+            body: .json(.init(updateTime: updateTime, space: space ?? "", visibility: .init(memoVisibility: visibility)))
         )
         _ = try result.ok
     }
