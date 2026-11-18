@@ -90,6 +90,7 @@
 		20B1A2C3D4E5F60718293A4E /* MemoKit in Frameworks */ = {isa = PBXBuildFile; productRef = 20B1A2C3D4E5F60718293A4C /* MemoKit */; };
 		2A9F4C1F2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A9F4C1E2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift */; };
 		2AA1B2C32F5A6B7C00D1E2F3 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */; };
+		A780CF4DF3C24EC7825456F8 /* MemoLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A780CF4DF3C24EC7825456F9 /* MemoLinkView.swift */; };
 		3832F25008B04FA7AB2BA0AB /* MemosMemoActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */; };
 		2AC7F0B72F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC7F0B62F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift */; };
 		2B7D9E3C2F4A110000ABC001 /* SyncStatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B7D9E3C2F4A110000ABC002 /* SyncStatusBadge.swift */; };
@@ -202,6 +203,7 @@
 		19FC1C7D290DA6E90078A7F2 /* Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Navigation.swift; sourceTree = "<group>"; };
 		2A9F4C1E2D9B100100A1B2C3 /* MemoMarkdownPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoMarkdownPreprocessor.swift; sourceTree = "<group>"; };
 		2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
+		A780CF4DF3C24EC7825456F9 /* MemoLinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoLinkView.swift; sourceTree = "<group>"; };
 		21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosMemoActions.swift; sourceTree = "<group>"; };
 		2AC7F0B62F6D1E9A00ABCD01 /* MemoTagMarkdownPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoTagMarkdownPreprocessor.swift; sourceTree = "<group>"; };
 		2B7D9E3C2F4A110000ABC002 /* SyncStatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusBadge.swift; sourceTree = "<group>"; };
@@ -422,6 +424,7 @@
 				193938DB29CF682D0027939F /* MemoCardContent.swift */,
 				197A4D3229599C300027427E /* MemoCardImageView.swift */,
 				2AA1B2C42F5A6B7C00D1E2F3 /* MemoView.swift */,
+				A780CF4DF3C24EC7825456F9 /* MemoLinkView.swift */,
 				21A573BB391C4DCE914DDE97 /* MemosMemoActions.swift */,
 				AA1000000000000000000003 /* MemoComments.swift */,
 				19F31BF628C3E26D000C5207 /* MemosList.swift */,
@@ -698,6 +701,7 @@
 				193AA89B28CCD34A00FF7EB6 /* Resources.swift in Sources */,
 				1919FBE929CF78BE00FEF570 /* Explore.swift in Sources */,
 				2AA1B2C32F5A6B7C00D1E2F3 /* MemoView.swift in Sources */,
+				A780CF4DF3C24EC7825456F8 /* MemoLinkView.swift in Sources */,
 				3832F25008B04FA7AB2BA0AB /* MemosMemoActions.swift in Sources */,
 				AA1000000000000000000002 /* MemoCommentsViewModel.swift in Sources */,
 				AA1000000000000000000004 /* MemoComments.swift in Sources */,

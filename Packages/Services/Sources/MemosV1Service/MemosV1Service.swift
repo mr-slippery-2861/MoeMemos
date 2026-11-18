@@ -76,7 +76,14 @@ public final class MemosV1Service: RemoteService, RemoteMemoReading, MemoComment
     
     public func readMemo(remoteId: String) async throws -> Memo {
         let result = try await client.MemoService_GetMemo(path: .init(memo: getId(remoteId: remoteId)))
-        return try result.ok.body.json.toMemo(host: hostURL)
+        switch result {
+        case .ok(let response):
+            return try response.body.json.toMemo(host: hostURL)
+        case .default(let statusCode, let response):
+            if statusCode == 401 { throw MoeMemosError.accessTokenExpired }
+            let message = (try? response.body.json)?.message
+            throw MoeMemosError.invalidStatusCode(statusCode, message)
+        }
     }
 
     public func listWorkspaceMemos(pageSize: Int, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?) {

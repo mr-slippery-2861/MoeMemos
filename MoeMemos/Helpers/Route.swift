@@ -37,6 +37,8 @@ extension Route {
             AccountDetailView(accountKey: accountKey)
         case .memo(let memoId):
             MemoView(memoId: memoId)
+        case .linkedMemo(let link, let requestID):
+            MemoLinkView(link: link).id(requestID)
         }
     }
 }

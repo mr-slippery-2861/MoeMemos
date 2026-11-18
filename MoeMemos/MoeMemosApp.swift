@@ -151,6 +151,14 @@ struct MoeMemosApp: App {
 
                     if url.host() == "memo" {
                         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                        if url.scheme?.lowercased() == "moememos",
+                           components?.queryItems?.contains(where: { $0.name == "server" || $0.name == "id" }) == true {
+                            appPath.presentedSheet = nil
+                            appPath.navigationRequest = NavigationRequest(
+                                root: .memos, path: [.linkedMemo(MemoLink(url: url), requestID: UUID())]
+                            )
+                            return
+                        }
                         if let identifier = components?.queryItems?.first(where: { $0.name == "entity_id" })?.value {
                             openMemo(identifier: identifier)
                             return

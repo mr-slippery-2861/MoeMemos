@@ -13,6 +13,11 @@ import SwiftData
 import Models
 import Factory
 
+public enum LinkedMemo {
+    case cached(PersistentIdentifier)
+    case preview(Memo, any RemoteService)
+}
+
 @MainActor
 @Observable public final class AccountManager: @unchecked Sendable {
     @ObservationIgnored private let preferences: UserDefaults
@@ -212,6 +217,36 @@ import Factory
     public func service(for accountKey: String) -> Service? {
         guard let account = account(for: accountKey) else { return nil }
         return makeService(for: account)
+    }
+
+    public func linkedMemo(_ link: MemoLink, for accountKey: String) async throws -> LinkedMemo {
+        guard let account = account(for: accountKey), link.matches(account) else { throw MoeMemosError.notLogin }
+        guard let remoteID = link.remoteID(for: account) else { throw MoeMemosError.invalidParams }
+        let store = LocalStore(context: modelContext, accountKey: accountKey)
+
+        func cachedMemo() throws -> LinkedMemo? {
+            guard let memo = store.fetchMemo(serverId: remoteID) else { return nil }
+            if memo.softDeleted && memo.syncState == .pendingDelete {
+                throw MoeMemosError.invalidStatusCode(404, nil)
+            }
+            return memo.softDeleted ? nil : .cached(memo.id)
+        }
+
+        if let cached = try cachedMemo() { return cached }
+        guard let remote = account.remoteService() else { throw MoeMemosError.notLogin }
+        let memo: Memo
+        switch remote {
+        case let reader as any RemoteMemoReading:
+            memo = try await reader.readMemo(remoteId: remoteID)
+        case let legacy as MemosV0Service:
+            memo = try await legacy.readMemo(remoteId: remoteID)
+        default:
+            throw MoeMemosError.unsupportedVersion
+        }
+        try Task.checkCancellation()
+        guard self.account(for: accountKey) != nil else { throw MoeMemosError.notLogin }
+        guard memo.remoteId == remoteID else { throw MoeMemosError.invalidStatusCode(404, nil) }
+        return try cachedMemo() ?? .preview(memo, remote)
     }
 
     public func selectAccount(key: String) throws {

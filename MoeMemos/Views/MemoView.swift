@@ -207,6 +207,14 @@ struct MemoView: View {
         ShareLink(item: memo.content) {
             Label("memo.share", systemImage: "square.and.arrow.up")
         }
+        if let account = accountManager.currentAccount, account.key == memo.accountKey,
+           let serverID = memo.serverId, let link = MemoLink(account: account, memoID: serverID) {
+            Button {
+                UIPasteboard.general.string = link.url.absoluteString
+            } label: {
+                Label("Copy Moe Memos Link", systemImage: "link")
+            }
+        }
         if let service = accountManager.currentRemoteService as? MemosWorkspaceService,
            let name = memo.serverId {
             Link(destination: service.webURL.appending(path: name)) {

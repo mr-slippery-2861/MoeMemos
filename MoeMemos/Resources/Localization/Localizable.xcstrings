@@ -1352,6 +1352,22 @@
         }
       }
     },
+    "Add your Memos account for %@." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请添加 %@ 的 Memos 账号。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請加入 %@ 的 Memos 帳號。"
+          }
+        }
+      }
+    },
     "Any thoughts…" : {
 
     },
@@ -1363,6 +1379,38 @@
     },
     "Attachments" : {
 
+    },
+    "Check your connection to the Memos server and try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查与 Memos 服务器的连接，然后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請檢查與 Memos 伺服器的連線，然後再試一次。"
+          }
+        }
+      }
+    },
+    "Choose Memos Account" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择 Memos 账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇 Memos 帳號"
+          }
+        }
+      }
     },
     "common.cancel" : {
       "extractionState" : "manual",
@@ -2117,6 +2165,38 @@
     },
     "Content" : {
 
+    },
+    "Copy Moe Memos Link" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制 Moe Memos 链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複製 Moe Memos 連結"
+          }
+        }
+      }
+    },
+    "Couldn’t Open Memo" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开笔记"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法開啟筆記"
+          }
+        }
+      }
     },
     "Daily" : {
 
@@ -4515,11 +4595,43 @@
         }
       }
     },
+    "Invalid Memo Link" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "笔记链接无效"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筆記連結無效"
+          }
+        }
+      }
+    },
     "Just to confirm, you wanted ‘%@’?" : {
 
     },
     "Launch Moe Memos" : {
 
+    },
+    "Loading memo…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载笔记…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入筆記…"
+          }
+        }
+      }
     },
     "location.add" : {
       "extractionState" : "manual",
@@ -8746,6 +8858,38 @@
         }
       }
     },
+    "Sign In to Open This Memo" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录后打开笔记"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入後開啟筆記"
+          }
+        }
+      }
+    },
+    "Sign in to this Memos server again, then retry." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请重新登录此 Memos 服务器，然后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請重新登入此 Memos 伺服器，然後再試一次。"
+          }
+        }
+      }
+    },
     "stats.day" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9117,12 +9261,60 @@
         }
       }
     },
+    "The link needs a Memos server address and a memo ID." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "链接需要包含 Memos 服务器地址和笔记 ID。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連結需要包含 Memos 伺服器位址和筆記 ID。"
+          }
+        }
+      }
+    },
     "There are %lld options matching ‘%@’." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "There are %1$lld options matching ‘%2$@’."
+          }
+        }
+      }
+    },
+    "This memo ID is invalid for your Memos server." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个笔记 ID 对当前 Memos 服务器无效。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個筆記 ID 對目前的 Memos 伺服器無效。"
+          }
+        }
+      }
+    },
+    "This memo was deleted or your account can’t access it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "笔记已删除，或当前账号无权访问。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筆記已刪除，或目前帳號無權存取。"
           }
         }
       }

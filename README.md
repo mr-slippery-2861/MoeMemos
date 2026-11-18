@@ -38,6 +38,20 @@ Personal Ad Hoc builds: [installation site](https://adhoc.ummon.tech/?app=moemem
 
 Moe Memos is a third-party client for [✍️memos](https://github.com/usememos/memos) and both projects aren't affiliated with each other.
 
+### Open a memo from a Bark notification
+
+Set Bark's JSON `url` field to a Moe Memos link. Use the server address configured on the receiving device and the memo ID from the Memos API. The link accepts either `memos/<id>` or the bare ID. URL-encode each query value when constructing a link.
+
+```json
+{
+  "title": "Memo reminder",
+  "body": "Tap to open the memo",
+  "url": "moememos://memo?server=https%3A%2F%2Fmemos.example.com&id=AbC123"
+}
+```
+
+You can also copy the link from the memo's actions menu with **Copy Moe Memos Link**. Moe Memos opens the saved memo if available. For a memo outside the device's cache, it uses the matching signed-in account to load just that memo in a temporary, read-only preview.
+
 ## Development
 
 Moe Memos tends to keep minimal and optimized for best native experience. It uses modern Swift and Apple platform features such as SwiftUI, async await and it keeps dependencies as few as possible.

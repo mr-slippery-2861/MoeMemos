@@ -45,6 +45,7 @@ struct MemoCardContent: View {
     let toggleTaskItem: ((String) -> Void)?
     let truncate: Bool
     let textSelectionEnabled: Bool
+    let showsAttachments: Bool
     
     @Environment(\.colorScheme) var colorScheme
     @State private var cachedRawMarkdown: String
@@ -55,12 +56,14 @@ struct MemoCardContent: View {
         memo: any MemoPresentable,
         toggleTaskItem: ((String) -> Void)? = nil,
         truncate: Bool = false,
-        textSelectionEnabled: Bool = false
+        textSelectionEnabled: Bool = false,
+        showsAttachments: Bool = true
     ) {
         self.memo = memo
         self.toggleTaskItem = toggleTaskItem
         self.truncate = truncate
         self.textSelectionEnabled = textSelectionEnabled
+        self.showsAttachments = showsAttachments
         let content = memo.content
         _cachedRawMarkdown = State(initialValue: content)
         let preprocessResult = MemoMarkdownPreprocessor.preprocess(content, truncate: truncate)
@@ -77,8 +80,10 @@ struct MemoCardContent: View {
                     .foregroundStyle(.tint)
             }
             
-            ForEach(resources()) { content in
-                resourceView(for: content)
+            if showsAttachments {
+                ForEach(resources()) { content in
+                    resourceView(for: content)
+                }
             }
             if let location = memo.location, location.isValid {
                 MemoLocationView(location: location)

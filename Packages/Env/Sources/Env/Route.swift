@@ -5,6 +5,7 @@
 //  Created by Mudkip on 2022/10/30.
 //
 
+import Foundation
 import Models
 import Observation
 import Factory
@@ -20,6 +21,7 @@ public enum Route: Hashable {
     case memosWorkspace
     case memosAccount(String)
     case memo(PersistentIdentifier)
+    case linkedMemo(MemoLink?, requestID: UUID)
 }
 
 public enum SheetDestination: Identifiable, Hashable {

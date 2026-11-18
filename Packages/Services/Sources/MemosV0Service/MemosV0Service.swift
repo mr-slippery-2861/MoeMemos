@@ -47,6 +47,19 @@ public final class MemosV0Service: RemoteService {
         let memos = try resp.ok.body.json
         return memos.map { $0.toMemo(host: hostURL) }
     }
+
+    public func readMemo(remoteId: String) async throws -> Memo {
+        guard let id = Int(remoteId) else { throw MoeMemosError.invalidParams }
+        switch try await client.getMemo(path: .init(memoId: id)) {
+        case .ok(let response): return try response.body.json.toMemo(host: hostURL)
+        case .badRequest: throw MoeMemosError.invalidParams
+        case .unauthorized: throw MoeMemosError.accessTokenExpired
+        case .forbidden: throw MoeMemosError.invalidStatusCode(403, nil)
+        case .notFound: throw MoeMemosError.invalidStatusCode(404, nil)
+        case .internalServerError: throw MoeMemosError.invalidStatusCode(500, nil)
+        case .undocumented(let statusCode, _): throw MoeMemosError.invalidStatusCode(statusCode, nil)
+        }
+    }
     
     public func listWorkspaceMemos(pageSize: Int, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?) {
         var offset = 0
