@@ -92,3 +92,9 @@ iOSInjectionProject/
 # Others
 .DS_Store
 Packages/**/Package.resolved
+
+# Personal Ad Hoc release inputs and build artifacts
+/adhoc-devices.txt
+/AdHoc/
+.wrangler/
+__pycache__/

@@ -18,6 +18,8 @@ Moe Memos
 
 Moe Memos is available on App Store for free. You can also build this app with Xcode and run on your devices. iOS 18 or higher is required.
 
+Personal Ad Hoc builds: [installation site](https://adhoc.ummon.tech/?app=moememos) · [packaging and deployment instructions](tools/ADHOC.md).
+
 ## Features
 
 ![Screenshot](https://memos.moe/screenshot.png)
