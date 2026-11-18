@@ -104,12 +104,12 @@ final class LocalStore {
         fetchResources()
     }
 
-    func allMemos(includeDeleted: Bool = true) -> [StoredMemo] {
+    func allMemos(includeDeleted: Bool = true) throws -> [StoredMemo] {
         let predicate = #Predicate<StoredMemo> { memo in
             memo.accountKey == accountKey
         }
         let descriptor = FetchDescriptor<StoredMemo>(predicate: predicate)
-        let memos = (try? context.fetch(descriptor)) ?? []
+        let memos = try context.fetch(descriptor)
         if includeDeleted {
             return memos
         }
@@ -213,41 +213,36 @@ final class LocalStore {
         reconcileResources(created.resources, to: local, preserveLocalOnly: true)
     }
 
-    func upsertMemo(_ memo: Memo, syncState: SyncState, keepSyncState: Bool = false) -> StoredMemo {
-        let serverId = memo.remoteId
-        let stored: StoredMemo
-        if let serverId, let existing = fetchMemo(serverId: serverId) {
-            stored = existing
-        } else {
-            stored = StoredMemo(
-                accountKey: accountKey,
-                serverId: serverId,
-                content: memo.content,
-                pinned: memo.pinned,
-                rowStatus: memo.rowStatus,
-                visibility: memo.visibility,
-                createdAt: memo.createdAt,
-                updatedAt: memo.updatedAt
-            )
+    func applySyncedMemo(_ memo: Memo, to existing: StoredMemo?) -> StoredMemo {
+        if let existing {
+            existing.location = memo.location
+            existing.content = memo.content
+            existing.pinned = memo.pinned
+            existing.rowStatus = memo.rowStatus
+            existing.visibility = memo.visibility
+            existing.updatedAt = memo.updatedAt
+            existing.softDeleted = false
+            existing.serverId = memo.remoteId ?? existing.serverId
+            existing.syncState = .synced
+            existing.lastSyncedAt = memo.updatedAt
+            return existing
         }
 
-        stored.location = memo.location
-        stored.content = memo.content
-        stored.pinned = memo.pinned
-        stored.rowStatus = memo.rowStatus
-        stored.visibility = memo.visibility
-        stored.updatedAt = memo.updatedAt
-        stored.softDeleted = false
-        stored.serverId = serverId ?? stored.serverId
-        if !keepSyncState {
-            stored.syncState = syncState
-            stored.lastSyncedAt = syncState == .synced ? memo.updatedAt : stored.lastSyncedAt
+        let stored = StoredMemo(
+            accountKey: accountKey,
+            serverId: memo.remoteId,
+            content: memo.content,
+            pinned: memo.pinned,
+            rowStatus: memo.rowStatus,
+            visibility: memo.visibility,
+            createdAt: memo.createdAt,
+            updatedAt: memo.updatedAt,
+            lastSyncedAt: memo.updatedAt
+        )
+        if let location = memo.location {
+            stored.location = location
         }
-
-        if stored.modelContext == nil {
-            context.insert(stored)
-        }
-
+        context.insert(stored)
         return stored
     }
 
@@ -334,9 +329,10 @@ final class LocalStore {
 
     func save() throws {
         let changed = context.insertedModelsArray + context.changedModelsArray + context.deletedModelsArray
+        let renamedAccountMemos = accountNameChanged ? (try? allMemos(includeDeleted: false)) ?? [] : []
         let memos = (changed.compactMap { $0 as? StoredMemo }
             + changed.compactMap { ($0 as? StoredResource)?.memo }
-            + (accountNameChanged ? allMemos(includeDeleted: false) : [])).filter { !$0.isDeleted }
+            + renamedAccountMemos).filter { !$0.isDeleted }
         // Capture deleted identifiers before save invalidates deleted models.
         let removed = context.deletedModelsArray.compactMap { model -> MemoEntityIdentifier? in
             guard let memo = model as? StoredMemo else { return nil }

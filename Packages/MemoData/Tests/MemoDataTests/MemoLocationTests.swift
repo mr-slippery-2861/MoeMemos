@@ -75,6 +75,36 @@ final class MemoLocationTests: XCTestCase {
         XCTAssertNil(memo.location)
     }
 
+    func testFirstSyncMergesRepeatedRemoteIDsInOrder() async throws {
+        let container = try container()
+        let remote = LocationRemote()
+        let createdAt = Date(timeIntervalSinceReferenceDate: 100)
+        let updatedAt = createdAt.addingTimeInterval(10)
+        let active = Memo(content: "Active", createdAt: createdAt, updatedAt: createdAt, remoteId: "memos/active")
+        var activeAgain = active
+        activeAgain.updatedAt = updatedAt
+        let moving = Memo(content: "Moving", createdAt: createdAt, updatedAt: createdAt, remoteId: "memos/moving")
+        var archived = moving
+        archived.rowStatus = .archived
+        archived.updatedAt = updatedAt
+        archived.location = place
+        remote.memos = [active, moving, activeAgain]
+        remote.archivedMemos = [archived]
+        let service = SyncingRemoteService(remote: remote, context: container.mainContext, accountKey: "remote")
+
+        try await service.sync()
+
+        let saved = try ModelContext(container).fetch(FetchDescriptor<StoredMemo>())
+        XCTAssertEqual(saved.count, 2)
+        let storedActive = try XCTUnwrap(saved.first { $0.serverId == active.remoteId })
+        XCTAssertEqual(storedActive.updatedAt, updatedAt)
+        XCTAssertEqual(storedActive.lastSyncedAt, updatedAt)
+        let storedArchived = try XCTUnwrap(saved.first { $0.serverId == archived.remoteId })
+        XCTAssertEqual(storedArchived.rowStatus, .archived)
+        XCTAssertEqual(storedArchived.updatedAt, updatedAt)
+        XCTAssertEqual(storedArchived.location, place)
+    }
+
     func testConcurrentLocationOnlyChangesPreserveBothVersions() async throws {
         let container = try container()
         let remote = LocationRemote()
@@ -132,6 +162,7 @@ private final class LocationRemote: RemoteService {
     var supportsMemoLocations = true
     var offline = false
     var memos: [Memo] = []
+    var archivedMemos: [Memo] = []
     var lastLocationUpdate: MemoLocationUpdate?
 
     private func checkConnection() throws {
@@ -139,7 +170,7 @@ private final class LocationRemote: RemoteService {
     }
     func memoVisibilities() -> [MemoVisibility] { [.private] }
     func listMemos() async throws -> [Memo] { try checkConnection(); return memos }
-    func listArchivedMemos() async throws -> [Memo] { [] }
+    func listArchivedMemos() async throws -> [Memo] { archivedMemos }
     func listWorkspaceMemos(pageSize: Int, pageToken: String?) async throws -> (list: [Memo], nextPageToken: String?) { ([], nil) }
     func createMemo(content: String, visibility: MemoVisibility?, resources: [Resource], tags: [String]?, createdAt: Date?, updatedAt: Date?, location: MemoLocation?) async throws -> Memo {
         try checkConnection()

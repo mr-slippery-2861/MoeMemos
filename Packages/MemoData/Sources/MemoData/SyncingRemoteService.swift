@@ -406,7 +406,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
             let remoteMemos = remoteNormal + remoteArchived
             let syncedAt = Date()
 
-            let localMemos = self.store.allMemos(includeDeleted: true)
+            let localMemos = try self.store.allMemos()
             var localByServerId: [String: StoredMemo] = [:]
             for memo in localMemos {
                 if let serverId = memo.serverId {
@@ -414,36 +414,33 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
                 }
             }
 
-            var remoteById: [String: Memo] = [:]
-            for memo in remoteMemos {
-                if let id = memo.remoteId {
-                    remoteById[id] = memo
-                }
-            }
-
+            var remoteIds: Set<String> = []
+            var importedMemos: [String: StoredMemo] = [:]
             for remoteMemo in remoteMemos {
                 guard let serverId = remoteMemo.remoteId else { continue }
+                remoteIds.insert(serverId)
                 if let local = localByServerId[serverId] {
                     if local.softDeleted {
                         if local.syncState == .pendingDelete {
-                            try await self.resolveLocalDeleted(local: local, remote: remoteMemo, syncedAt: syncedAt)
+                            try await self.resolveLocalDeleted(local: local, remote: remoteMemo)
                         } else {
                             // Deleted rows not in `pendingDelete` were not explicitly requested by the user.
                             // Never treat them as authority to delete server data.
-                            self.applyRemoteMemo(remoteMemo, syncedAt: syncedAt)
+                            self.applyRemoteMemo(remoteMemo, to: local)
                         }
                     } else {
-                        try await self.resolveBothPresent(local: local, remote: remoteMemo, syncedAt: syncedAt)
+                        try await self.resolveBothPresent(local: local, remote: remoteMemo)
                     }
                 } else {
-                    self.applyRemoteMemo(remoteMemo, syncedAt: syncedAt)
+                    // A memo can appear more than once across pages or archive states.
+                    importedMemos[serverId] = self.applyRemoteMemo(remoteMemo, to: importedMemos[serverId])
                 }
             }
 
             for local in localMemos {
                 if let serverId = local.serverId {
-                    if remoteById[serverId] == nil {
-                        try await self.resolveServerDeleted(local: local, syncedAt: syncedAt)
+                    if !remoteIds.contains(serverId) {
+                        try await self.resolveServerDeleted(local: local)
                     }
                 } else {
                     if local.softDeleted {
@@ -452,7 +449,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
                     } else {
                         do {
                             let pushed = try await self.pushLocalMemo(local: local, tags: nil)
-                            self.applyRemoteMemo(pushed, syncedAt: syncedAt)
+                            self.applyRemoteMemo(pushed)
                         } catch {
                             local.syncState = .pendingCreate
                         }
@@ -490,16 +487,16 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         try store.save()
     }
 
-    private func resolveLocalDeleted(local: StoredMemo, remote: Memo, syncedAt: Date) async throws {
+    private func resolveLocalDeleted(local: StoredMemo, remote: Memo) async throws {
         guard local.syncState == .pendingDelete else {
-            applyRemoteMemo(remote, syncedAt: syncedAt)
+            applyRemoteMemo(remote, to: local)
             return
         }
         let remoteChanged = hasRemoteChanged(local: local, remote: remote)
         let remoteMatchesDeletedLocal = memoEquivalent(memoFromStored(local), remote)
 
         if remoteChanged || !remoteMatchesDeletedLocal {
-            applyRemoteMemo(remote, syncedAt: syncedAt)
+            applyRemoteMemo(remote, to: local)
         } else {
             do {
                 try await remoteDelete(remoteId: remote.remoteId)
@@ -512,7 +509,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         }
     }
 
-    private func resolveBothPresent(local: StoredMemo, remote: Memo, syncedAt: Date) async throws {
+    private func resolveBothPresent(local: StoredMemo, remote: Memo) async throws {
         let localMemo = memoFromStored(local)
         let localChanged = local.syncState != .synced
         let remoteChanged = hasRemoteChanged(local: local, remote: remote)
@@ -525,14 +522,14 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         }
 
         if !localChanged {
-            applyRemoteMemo(remote, syncedAt: syncedAt)
+            applyRemoteMemo(remote, to: local)
             return
         }
 
         if !remoteChanged {
             do {
                 let updated = try await pushLocalMemo(local: local, tags: nil, remoteSnapshot: remote)
-                applyRemoteMemo(updated, syncedAt: syncedAt)
+                applyRemoteMemo(updated)
                 try store.save()
             } catch {
                 local.syncState = local.serverId == nil ? .pendingCreate : .pendingUpdate
@@ -542,7 +539,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
 
         // Both changed.
         _ = try? await createDuplicateFromLocal(local)
-        applyRemoteMemo(remote, syncedAt: syncedAt)
+        applyRemoteMemo(remote, to: local)
     }
 
     private func hasRemoteChanged(local: StoredMemo, remote: Memo) -> Bool {
@@ -553,7 +550,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         return remote.updatedAt != lastSyncedAt
     }
 
-    private func resolveServerDeleted(local: StoredMemo, syncedAt: Date) async throws {
+    private func resolveServerDeleted(local: StoredMemo) async throws {
         if local.softDeleted {
             local.syncState = .synced
             return
@@ -566,7 +563,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
             local.lastSyncedAt = nil
             do {
                 let pushed = try await pushLocalMemo(local: local, tags: nil)
-                applyRemoteMemo(pushed, syncedAt: syncedAt)
+                applyRemoteMemo(pushed)
                 try store.save()
             } catch {
                 local.syncState = .pendingCreate
@@ -613,13 +610,18 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
         }
     }
 
-    private func applyRemoteMemo(_ memo: Memo, syncedAt: Date) {
+    private func applyRemoteMemo(_ memo: Memo) {
         guard let serverId = memo.remoteId else { return }
-        let stored = store.upsertMemo(memo, syncState: .synced)
-        stored.serverId = serverId
-        stored.softDeleted = false
-        stored.lastSyncedAt = memo.updatedAt
-        store.reconcileResources(memo.resources, to: stored, preserveLocalOnly: true)
+        applyRemoteMemo(memo, to: store.fetchMemo(serverId: serverId))
+    }
+
+    @discardableResult
+    private func applyRemoteMemo(_ memo: Memo, to existing: StoredMemo?) -> StoredMemo {
+        let stored = store.applySyncedMemo(memo, to: existing)
+        if existing != nil || !memo.resources.isEmpty {
+            store.reconcileResources(memo.resources, to: stored, preserveLocalOnly: true)
+        }
+        return stored
     }
 
     private func createDuplicateFromLocal(_ local: StoredMemo) async throws -> StoredMemo {
@@ -716,7 +718,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
             let fetched = try await reader.readMemo(remoteId: serverId)
             if hasRemoteChanged(local: local, remote: fetched) {
                 if memoEquivalent(memoFromStored(local), fetched) {
-                    applyRemoteMemo(fetched, syncedAt: fetched.updatedAt)
+                    applyRemoteMemo(fetched)
                     return fetched
                 }
                 // Let full sync reconcile divergent edits without replacing the remote audience.
@@ -738,7 +740,7 @@ final class SyncingRemoteService: Service, SyncableService, PendingOperationsSer
             updatedAt: local.updatedAt,
             location: supportsMemoLocations && locationChanged ? memo.location.map(MemoLocationUpdate.set) ?? .remove : nil
         )
-        applyRemoteMemo(updated, syncedAt: updated.updatedAt)
+        applyRemoteMemo(updated)
         return updated
     }
 

@@ -52,9 +52,8 @@ final class LocalService: Service {
             location: location
         )
 
-        let stored = store.upsertMemo(memo, syncState: .synced)
+        let stored = store.applySyncedMemo(memo, to: nil)
         stored.lastSyncedAt = .now
-        stored.syncState = .synced
 
         store.setResources(resources, for: stored)
         try store.save()
